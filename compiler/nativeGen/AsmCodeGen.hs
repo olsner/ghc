@@ -373,10 +373,9 @@ cmmNativeGenStream dflags this_mod modLoc ncgImpl h us cmm_stream ngs
 
           -- Insert split marker, generate native code
           let splitFlag = gopt Opt_SplitObjs dflags
-              split_marker = CmmProc mapEmpty mkSplitMarkerLabel [] $
-                             ofBlockList (panic "split_marker_entry") []
-              cmms' | splitFlag  = split_marker : cmms
-                    | otherwise  = cmms
+              split_marker = mkSplitMarker mkSplitMarkerLabel
+              cmms' | splitFlag = split_marker : cmms
+                    | otherwise = cmms
           (ngs',us') <- cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap us
                                       cmms' ngs 0
 
@@ -401,6 +400,10 @@ cmmNativeGenStream dflags this_mod modLoc ncgImpl h us cmm_stream ngs
 
           cmmNativeGenStream dflags this_mod modLoc ncgImpl h us''
               cmm_stream' ngs''
+
+mkSplitMarker :: CLabel -> RawCmmDecl
+mkSplitMarker lbl = CmmProc mapEmpty lbl []
+                            (ofBlockList (panic "split_marker_entry") [])
 
 -- | Do native code generation on all these cmms.
 --

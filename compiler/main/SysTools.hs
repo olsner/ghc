@@ -924,7 +924,8 @@ runLink dflags args = do
   linkargs <- neededLinkArgs `fmap` getLinkerInfo dflags
   let (p,args0) = pgm_l dflags
       args1     = map Option (getOpts dflags opt_l)
-      args2     = args0 ++ linkargs ++ args1 ++ args
+      gcargs    = [Option "-Wl,--gc-sections"]
+      args2     = args0 ++ gcargs ++ linkargs ++ args1 ++ args
   mb_env <- getGccEnv args2
   runSomethingResponseFile dflags ld_filter "Linker" p args2 mb_env
   where
@@ -982,7 +983,8 @@ runLibtool :: DynFlags -> [Option] -> IO ()
 runLibtool dflags args = do
   linkargs <- neededLinkArgs `fmap` getLinkerInfo dflags
   let args1      = map Option (getOpts dflags opt_l)
-      args2      = [Option "-static"] ++ args1 ++ args ++ linkargs
+      gcargs    = [Option "-Wl,--gc-sections"]
+      args2      = [Option "-static"] ++ gcargs ++ args1 ++ args ++ linkargs
       libtool    = pgm_libtool dflags
   mb_env <- getGccEnv args2
   runSomethingFiltered dflags id "Linker" libtool args2 mb_env

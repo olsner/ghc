@@ -52,7 +52,12 @@ import Data.Bits
 -- Printing this stuff out
 
 pprNatCmmDecl :: NatCmmDecl (Alignment, CmmStatics) Instr -> SDoc
-pprNatCmmDecl (CmmData section dats) =
+pprNatCmmDecl (CmmData Text dats@(_,(Statics lbl _))) =
+  pprSplitMarker lbl "CmmData Text" $$ pprDatas dats
+pprNatCmmDecl (CmmData Data dats@(_,(Statics lbl _))) =
+  pprSplitDataMarker lbl "CmmData Data" $$ pprDatas dats
+pprNatCmmDecl (CmmData section dats@(_,(Statics lbl _))) =
+  ptext (sLit "/*") <> pprLabel lbl <> ptext (sLit "*/") $$
   pprSectionHeader section $$ pprDatas dats
 
 pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
@@ -61,11 +66,11 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
     Nothing ->
        case blocks of
          []     -> -- special case for split markers:
-           pprLabel lbl
+           pprSplitMarker lbl "special case, explicit split marker"
          blocks -> -- special case for code without info table:
-           pprSectionHeader Text $$
+           pprSplitMarker lbl "code without info table" $$
            pprLabel lbl $$ -- blocks guaranteed not null, so label needed
-           vcat (map (pprBasicBlock top_info) blocks) $$
+           vcat (map (pprBasicBlock top_info lbl) blocks) $$
            (if gopt Opt_Debug dflags
             then ppr (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
            pprSizeDecl lbl
@@ -76,7 +81,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
           then pprSectionHeader Text $$
                ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
-      vcat (map (pprBasicBlock top_info) blocks) $$
+      vcat (map (pprBasicBlock top_info info_lbl) blocks) $$
          -- above: Even the first block gets a label, because with branch-chain
          -- elimination, it might be the target of a goto.
             (if platformHasSubsectionsViaSymbols platform
@@ -96,12 +101,12 @@ pprSizeDecl :: CLabel -> SDoc
 pprSizeDecl lbl
  = sdocWithPlatform $ \platform ->
    if osElfTarget (platformOS platform)
-   then ptext (sLit "\t.size") <+> ppr lbl
-     <> ptext (sLit ", .-") <> ppr lbl
+   then pprSplitMarker lbl "for size declaration" $$
+        ptext (sLit "\t.size") <+> ppr lbl <> ptext (sLit ", .-") <> ppr lbl
    else empty
 
-pprBasicBlock :: BlockEnv CmmStatics -> NatBasicBlock Instr -> SDoc
-pprBasicBlock info_env (BasicBlock blockid instrs)
+pprBasicBlock :: BlockEnv CmmStatics -> CLabel -> NatBasicBlock Instr -> SDoc
+pprBasicBlock info_env top_lbl (BasicBlock blockid instrs)
   = sdocWithDynFlags $ \dflags ->
     maybe_infotable $$
     pprLabel asmLbl $$
@@ -113,7 +118,8 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
        Just (Statics info_lbl info) ->
-           pprSectionHeader Text $$
+           -- pprSectionHeader Text $$
+           pprSplitMarker top_lbl "pprBasicBlock maybe_infotable" $$
            infoTableLoc $$
            vcat (map pprData info) $$
            pprLabel info_lbl
@@ -155,6 +161,15 @@ pprLabel lbl = pprGloblDecl lbl
             $$ pprTypeAndSizeDecl lbl
             $$ (ppr lbl <> char ':')
 
+pprSplitMarker' :: SDoc -> CLabel -> String -> SDoc
+pprSplitMarker' sec lbl comment = sdocWithPlatform $ \platform ->
+  ptext (sLit ".section .") <> sec <> ptext (sLit ".") <> ppr lbl <> ptext (sLit (" /* "++comment++" */")) $$
+  ptext (sLit ".align ") <> textAlign platform
+
+pprSplitMarker :: CLabel -> String -> SDoc
+pprSplitMarker = pprSplitMarker' (ptext (sLit "text"))
+pprSplitDataMarker :: CLabel -> String -> SDoc
+pprSplitDataMarker = pprSplitMarker' (ptext (sLit "data"))
 
 pprASCII :: [Word8] -> SDoc
 pprASCII str
@@ -385,6 +400,16 @@ pprAddr (AddrBaseIndex base index displacement)
     ppr_disp imm        = pprImm imm
 
 
+textAlignOS :: OS -> Bool -> SDoc
+textAlignOS OSDarwin True = int 2
+textAlignOS OSDarwin False = int 3
+textAlignOS _ True = ptext (sLit "4,0x90")
+textAlignOS _ False = int 8
+
+textAlign :: Platform -> SDoc
+textAlign platform = textAlignOS (platformOS platform) (target32Bit platform)
+
+-- TODO Footprint: every section should come with a label to name a subsection
 pprSectionHeader :: Section -> SDoc
 pprSectionHeader seg =
  sdocWithPlatform $ \platform ->

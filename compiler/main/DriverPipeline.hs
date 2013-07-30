@@ -2123,13 +2123,19 @@ joinObjectFiles dflags o_files output_fn = do
                      ++ map SysTools.Option ld_build_id
                      ++ [ SysTools.Option "-o",
                           SysTools.FileOption "" output_fn ]
-                     ++ args)
+                     ++ args
+                     ++ argsNoGC)
 
       -- suppress the generation of the .note.gnu.build-id section,
       -- which we don't need and sometimes causes ld to emit a
       -- warning:
       ld_build_id | sLdSupportsBuildId mySettings = ["-Wl,--build-id=none"]
                   | otherwise                     = []
+
+      -- Don't gc sections when partially linking - since we don't have the
+      -- final program we don't know what we'll eventually need in the result.
+      argsNoGC | ldIsGnuLd = [SysTools.Option "-Wl,--no-gc-sections"]
+               | otherwise = []
 
   ccInfo <- getCompilerInfo dflags
   if ldIsGnuLd
