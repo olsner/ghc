@@ -5091,6 +5091,37 @@ PLTSize(void)
 }
 #endif
 
+static uint32_t elf_shnum(Elf_Ehdr* ehdr)
+{
+   Elf_Shdr* shdr = (Elf_Shdr*) ((char*)ehdr + ehdr->e_shoff);
+   uint32_t shnum = ehdr->e_shnum;
+   return shnum != SHN_UNDEF ? shnum : shdr[0].sh_size;
+}
+
+static uint32_t elf_shstrndx(Elf_Ehdr* ehdr)
+{
+   Elf_Shdr* shdr = (Elf_Shdr*) ((char*)ehdr + ehdr->e_shoff);
+   uint32_t shstrndx = ehdr->e_shstrndx;
+   return shstrndx < SHN_XINDEX ? shstrndx : shdr[0].sh_link;
+}
+
+/* FIXME Is this always an Elf32_Word, even in ELF64? (Looks like it, it works
+ * on x86-64.) */
+static Elf32_Word*
+get_shndx_table(Elf_Ehdr* ehdr)
+{
+   uint32_t  i;
+   char*     ehdrC    = (char*)ehdr;
+   Elf_Shdr* shdr     = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
+
+   for (i = 0; i < elf_shnum(ehdr); i++) {
+     if (shdr[i].sh_type == SHT_SYMTAB_SHNDX) {
+       return (Elf32_Word*)(ehdrC + shdr[i].sh_offset);
+     }
+   }
+   return NULL;
+}
+
 
 /*
  * Generic ELF functions
@@ -5101,7 +5132,8 @@ ocVerifyImage_ELF ( ObjectCode* oc )
 {
    Elf_Shdr* shdr;
    Elf_Sym*  stab;
-   int i, j, nent, nstrtab, nsymtabs;
+   int j, nent, nstrtab, nsymtabs;
+   uint32_t i, shnum, shstrndx;
    char* sh_strtab;
 
    char*     ehdrC = (char*)(oc->image);
@@ -5163,22 +5195,24 @@ ocVerifyImage_ELF ( ObjectCode* oc )
 
    IF_DEBUG(linker,debugBelch(
              "\nSection header table: start %ld, n_entries %d, ent_size %d\n",
-             (long)ehdr->e_shoff, ehdr->e_shnum, ehdr->e_shentsize  ));
+             (long)ehdr->e_shoff, elf_shnum(ehdr), ehdr->e_shentsize  ));
 
    ASSERT (ehdr->e_shentsize == sizeof(Elf_Shdr));
 
    shdr = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
 
-   if (ehdr->e_shstrndx == SHN_UNDEF) {
+   shstrndx = elf_shstrndx(ehdr);
+   if (shstrndx == SHN_UNDEF) {
       errorBelch("%s: no section header string table", oc->fileName);
       return 0;
    } else {
       IF_DEBUG(linker,debugBelch( "Section header string table is section %d\n",
-                          ehdr->e_shstrndx));
-      sh_strtab = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
+                          shstrndx));
+      sh_strtab = ehdrC + shdr[shstrndx].sh_offset;
    }
 
-   for (i = 0; i < ehdr->e_shnum; i++) {
+   shnum = elf_shnum(ehdr);
+   for (i = 0; i < shnum; i++) {
       IF_DEBUG(linker,debugBelch("%2d:  ", i ));
       IF_DEBUG(linker,debugBelch("type=%2d  ", (int)shdr[i].sh_type ));
       IF_DEBUG(linker,debugBelch("size=%4d  ", (int)shdr[i].sh_size ));
@@ -5187,7 +5221,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
                ehdrC + shdr[i].sh_offset,
                       ehdrC + shdr[i].sh_offset + shdr[i].sh_size - 1));
 
-#define SECTION_INDEX_VALID(ndx) (ndx > SHN_UNDEF && ndx < ehdr->e_shnum)
+#define SECTION_INDEX_VALID(ndx) (ndx > SHN_UNDEF && ndx < shnum)
 
       switch (shdr[i].sh_type) {
 
@@ -5246,10 +5280,10 @@ ocVerifyImage_ELF ( ObjectCode* oc )
 
    IF_DEBUG(linker,debugBelch( "\nString tables\n" ));
    nstrtab = 0;
-   for (i = 0; i < ehdr->e_shnum; i++) {
+   for (i = 0; i < shnum; i++) {
       if (shdr[i].sh_type == SHT_STRTAB
           /* Ignore the section header's string table. */
-          && i != ehdr->e_shstrndx
+          && i != shstrndx
           /* Ignore string tables named .stabstr, as they contain
              debugging info. */
           && 0 != memcmp(".stabstr", sh_strtab + shdr[i].sh_name, 8)
@@ -5264,7 +5298,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
 
    nsymtabs = 0;
    IF_DEBUG(linker,debugBelch( "Symbol tables\n" ));
-   for (i = 0; i < ehdr->e_shnum; i++) {
+   for (i = 0; i < shnum; i++) {
       if (shdr[i].sh_type != SHT_SYMTAB) continue;
       IF_DEBUG(linker,debugBelch( "section %d is a symbol table\n", i ));
       nsymtabs++;
@@ -5278,10 +5312,18 @@ ocVerifyImage_ELF ( ObjectCode* oc )
          errorBelch("%s: non-integral number of symbol table entries", oc->fileName);
          return 0;
       }
+      Elf32_Word* shndxTable = get_shndx_table(ehdr);
       for (j = 0; j < nent; j++) {
+        uint32_t secno = stab[j].st_shndx;
+         if (secno == SHN_XINDEX) {
+           if (!shndxTable) {
+             secno = -1;
+           }
+           secno = shndxTable[j];
+         }
          IF_DEBUG(linker,debugBelch("   %2d  ", j ));
          IF_DEBUG(linker,debugBelch("  sec=%-5d  size=%-3d  val=%5p  ",
-                             (int)stab[j].st_shndx,
+                             (int)secno,
                              (int)stab[j].st_size,
                              (char*)stab[j].st_value ));
 
@@ -5305,9 +5347,10 @@ ocVerifyImage_ELF ( ObjectCode* oc )
          }
          IF_DEBUG(linker,debugBelch("  " ));
 
-         IF_DEBUG(linker,debugBelch("name=%s\n",
+         IF_DEBUG(linker,debugBelch("other=%2x ", stab[j].st_other ));
+         IF_DEBUG(linker,debugBelch("name=%s [%x]\n",
                         ehdrC + shdr[shdr[i].sh_link].sh_offset
-                              + stab[j].st_name ));
+                              + stab[j].st_name, stab[j].st_name ));
       }
    }
 
@@ -5359,21 +5402,22 @@ static int getSectionKind_ELF( Elf_Shdr *hdr, int *is_bss )
     return SECTIONKIND_OTHER;
 }
 
-
 static int
 ocGetNames_ELF ( ObjectCode* oc )
 {
-   int i, j, nent;
+   int j, nent;
+   uint32_t i;
    Elf_Sym* stab;
 
    char*     ehdrC    = (char*)(oc->image);
    Elf_Ehdr* ehdr     = (Elf_Ehdr*)ehdrC;
    char*     strtab;
    Elf_Shdr* shdr     = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
+   Elf32_Word* shndxTable = NULL;
 
    ASSERT(symhash != NULL);
 
-   for (i = 0; i < ehdr->e_shnum; i++) {
+   for (i = 0; i < elf_shnum(ehdr); i++) {
       /* Figure out what kind of section it is.  Logic derived from
          Figure 1.14 ("Special Sections") of the ELF document
          ("Portable Formats Specification, Version 1.1"). */
@@ -5423,7 +5467,18 @@ ocGetNames_ELF ( ObjectCode* oc )
          HsBool isWeak = HS_BOOL_FALSE;
          char* ad      = NULL;
          char* nm      = strtab + stab[j].st_name;
-         int   secno   = stab[j].st_shndx;
+         uint32_t   secno   = stab[j].st_shndx;
+
+         /* We need to look up the section index in SHT_SYMTAB_SHNDX. */
+         if (secno == SHN_XINDEX) {
+           if (!shndxTable) {
+             shndxTable = get_shndx_table(ehdr);
+           }
+           if (!shndxTable) {
+             return 0; /* FIXME Is 0 or 1 the failure value here? */
+           }
+           secno = shndxTable[j];
+         }
 
          /* Figure out if we want to add it; if so, set ad to its
             address.  Otherwise leave ad == NULL. */
@@ -5444,9 +5499,12 @@ ocGetNames_ELF ( ObjectCode* oc )
                 || ELF_ST_BIND(stab[j].st_info)==STB_WEAK
               )
               /* and not an undefined symbol */
-              && stab[j].st_shndx != SHN_UNDEF
+              && secno != SHN_UNDEF
               /* and not in a "special section" */
-              && stab[j].st_shndx < SHN_LORESERVE
+              /* (I'm not sure these special sections exist at all, according
+               * to my manpage, "Every  symbol  table  entry  is "defined" in
+               * relation to some section.") */
+              && (secno < SHN_LORESERVE || stab[j].st_shndx == SHN_XINDEX)
               &&
               /* and it's a not a section or string table or anything silly */
               ( ELF_ST_TYPE(stab[j].st_info)==STT_FUNC ||
@@ -5455,7 +5513,7 @@ ocGetNames_ELF ( ObjectCode* oc )
               )
             ) {
             /* Section 0 is the undefined section, hence > and not >=. */
-            ASSERT(secno > 0 && secno < ehdr->e_shnum);
+            ASSERT(secno > 0 && secno < elf_shnum(ehdr));
             /*
             if (shdr[secno].sh_type == SHT_NOBITS) {
                debugBelch("   BSS symbol, size %d off %d name %s\n",
@@ -5533,6 +5591,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
    int target_shndx = shdr[shnum].sh_info;
    int symtab_shndx = shdr[shnum].sh_link;
    int strtab_shndx = shdr[symtab_shndx].sh_link;
+   Elf32_Word* shndx_table = get_shndx_table((Elf_Ehdr*)ehdrC);
 
    stab  = (Elf_Sym*) (ehdrC + shdr[ symtab_shndx ].sh_offset);
    strtab= (char*)    (ehdrC + shdr[ strtab_shndx ].sh_offset);
@@ -5580,8 +5639,12 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
             /* Yes, so we can get the address directly from the ELF symbol
                table. */
             symbol = sym.st_name==0 ? "(noname)" : strtab+sym.st_name;
+            Elf32_Word secno = sym.st_shndx;
+            if (secno == SHN_XINDEX) {
+              secno = shndx_table[ELF_R_SYM(info)];
+            }
             S = (Elf_Addr)
-                (ehdrC + shdr[ sym.st_shndx ].sh_offset
+                (ehdrC + shdr[ secno ].sh_offset
                        + stab[ELF_R_SYM(info)].st_value);
 
          } else {
@@ -5836,6 +5899,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
    int         nent = shdr[shnum].sh_size / sizeof(Elf_Rela);
    int symtab_shndx = shdr[shnum].sh_link;
    int strtab_shndx = shdr[symtab_shndx].sh_link;
+   Elf32_Word* shndx_table = get_shndx_table((Elf_Ehdr*)ehdrC);
 #if defined(DEBUG) || defined(sparc_HOST_ARCH) || defined(ia64_HOST_ARCH) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
    /* This #ifdef only serves to avoid unused-var warnings. */
    Elf_Addr targ;
@@ -5884,8 +5948,12 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
             /* Yes, so we can get the address directly from the ELF symbol
                table. */
             symbol = sym.st_name==0 ? "(noname)" : strtab+sym.st_name;
+            Elf32_Word secno = sym.st_shndx;
+            if (secno == SHN_XINDEX) {
+              secno = shndx_table[ELF_R_SYM(info)];
+            }
             S = (Elf_Addr)
-                (ehdrC + shdr[ sym.st_shndx ].sh_offset
+                (ehdrC + shdr[ secno ].sh_offset
                        + stab[ELF_R_SYM(info)].st_value);
 #ifdef ELF_FUNCTION_DESC
             /* Make a function descriptor for this function */
@@ -6158,13 +6226,13 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 static int
 ocResolve_ELF ( ObjectCode* oc )
 {
-   int   shnum, ok;
+   uint32_t  shnum, ok;
    char*     ehdrC = (char*)(oc->image);
    Elf_Ehdr* ehdr  = (Elf_Ehdr*) ehdrC;
    Elf_Shdr* shdr  = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
 
    /* Process the relocation sections. */
-   for (shnum = 0; shnum < ehdr->e_shnum; shnum++) {
+   for (shnum = 0; shnum < elf_shnum(ehdr); shnum++) {
       if (shdr[shnum].sh_type == SHT_REL) {
          ok = do_Elf_Rel_relocations ( oc, ehdrC, shdr, shnum );
          if (!ok) return ok;
@@ -6247,22 +6315,25 @@ static int ocAllocateSymbolExtras_ELF( ObjectCode *oc )
 {
   Elf_Ehdr *ehdr;
   Elf_Shdr* shdr;
-  int i;
+  uint32_t i, shnum;
 
   ehdr = (Elf_Ehdr *) oc->image;
   shdr = (Elf_Shdr *) ( ((char *)oc->image) + ehdr->e_shoff );
 
-  for( i = 0; i < ehdr->e_shnum; i++ )
+  shnum = elf_shnum(ehdr);
+
+  for( i = 0; i < shnum; i++ )
     if( shdr[i].sh_type == SHT_SYMTAB )
       break;
 
-  if( i == ehdr->e_shnum )
+  if( i == shnum )
   {
     // Not having a symbol table is not in principle a problem.
     // When an object file has no symbols then the 'strip' program
     // typically will remove the symbol table entirely.
-    IF_DEBUG(linker, debugBelch( "The ELF file %s contains no symtab\n",
-             oc->archiveMemberName ? oc->archiveMemberName : oc->fileName ));
+    IF_DEBUG(linker, debugBelch( "The ELF file %s has %lu sections but no symtab\n",
+             oc->archiveMemberName ? oc->archiveMemberName : oc->fileName,
+			 (unsigned long)shnum));
     return 1;
   }
 
