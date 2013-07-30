@@ -649,8 +649,8 @@ getRegister' _ (CmmLit (CmmFloat f frep)) = do
     Amode addr addr_code <- getAmode D dynRef
     let format = floatFormat frep
         code dst =
-            LDATA ReadOnlyData (Statics lbl
-                                   [CmmStaticLit (CmmFloat f frep)])
+            LDATA (Section ReadOnlyData lbl)
+                  (Statics lbl [CmmStaticLit (CmmFloat f frep)])
             `consOL` (addr_code `snocOL` LD format dst addr)
     return (Any format code)
 
@@ -671,8 +671,7 @@ getRegister' dflags (CmmLit lit)
        let rep = cmmLitType dflags lit
            format = cmmTypeFormat rep
            code dst =
-            LDATA ReadOnlyData (Statics lbl
-                                   [CmmStaticLit lit])
+            LDATA (Section ReadOnlyData lbl) (Statics lbl [CmmStaticLit lit])
             `consOL` (addr_code `snocOL` LD format dst addr)
        return (Any format code)
 
@@ -1528,7 +1527,7 @@ generateJumpTableForInstr dflags (BCTR ids (Just lbl)) =
                       jumpTableEntryRel (Just blockid)
                         = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
                             where blockLabel = mkAsmTempLabel (getUnique blockid)
-    in Just (CmmData ReadOnlyData (Statics lbl jumpTable))
+    in Just (CmmData (Section ReadOnlyData lbl) (Statics lbl jumpTable))
 generateJumpTableForInstr _ _ = Nothing
 
 -- -----------------------------------------------------------------------------
@@ -1719,7 +1718,7 @@ coerceInt2FP' ArchPPC fromRep toRep x = do
     Amode addr addr_code <- getAmode D dynRef
     let
         code' dst = code `appOL` maybe_exts `appOL` toOL [
-                LDATA ReadOnlyData $ Statics lbl
+                LDATA (Section ReadOnlyData lbl) $ Statics lbl
                                  [CmmStaticLit (CmmInt 0x43300000 W32),
                                   CmmStaticLit (CmmInt 0x80000000 W32)],
                 XORIS itmp src (ImmInt 0x8000),

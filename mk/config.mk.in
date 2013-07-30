@@ -301,6 +301,10 @@ SupportsSplitObjs := $(strip \
 # By default, enable SplitObjs for the libraries if this build supports it
 SplitObjs=$(SupportsSplitObjs)
 
+# May want to mess with the defaults for this later. E.g. disabling SplitObjs
+# and enabling sections by default.
+SplitSections=NO
+
 # ----------------------------------------------------------------------------
 
 # There are a number of things which technically depend on GHC (e.g. if

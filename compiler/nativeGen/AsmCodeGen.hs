@@ -372,10 +372,10 @@ cmmNativeGenStream dflags this_mod modLoc ncgImpl h us cmm_stream ngs
               dbgMap = debugToMap ndbgs
 
           -- Insert split marker, generate native code
-          let splitFlag = gopt Opt_SplitObjs dflags
+          let splitObjs = gopt Opt_SplitObjs dflags
               split_marker = CmmProc mapEmpty mkSplitMarkerLabel [] $
                              ofBlockList (panic "split_marker_entry") []
-              cmms' | splitFlag  = split_marker : cmms
+              cmms' | splitObjs  = split_marker : cmms
                     | otherwise  = cmms
           (ngs',us') <- cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap us
                                       cmms' ngs 0
@@ -385,10 +385,11 @@ cmmNativeGenStream dflags this_mod modLoc ncgImpl h us cmm_stream ngs
           dumpIfSet_dyn dflags Opt_D_dump_debug "Debug Infos"
             (vcat $ map ppr ldbgs)
 
+          let splitSections = gopt Opt_SplitSections dflags
           -- Emit & clear DWARF information when generating split
           -- object files, as we need it to land in the same object file
           (ngs'', us'') <-
-            if debugFlag && splitFlag
+            if debugFlag && (splitObjs || splitSections)
             then do (dwarf, us'') <- dwarfGen dflags modLoc us ldbgs
                     emitNativeCode dflags h dwarf
                     return (ngs' { ngs_debug = []

@@ -63,41 +63,46 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
          []     -> -- special case for split markers:
            pprLabel lbl
          blocks -> -- special case for code without info table:
-           pprSectionHeader Text $$
+           pprSectionHeader (Section Text lbl) $$
            pprLabel lbl $$ -- blocks guaranteed not null, so label needed
            vcat (map (pprBasicBlock top_info) blocks) $$
            (if gopt Opt_Debug dflags
             then ppr (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
+           -- verify that we don't change section anywhere, we want the size
+           -- to be in the same section as the things it's sizing.
            pprSizeDecl lbl
 
     Just (Statics info_lbl _) ->
       sdocWithPlatform $ \platform ->
+      pprSectionHeader (Section Text info_lbl) $$
       (if platformHasSubsectionsViaSymbols platform
-          then pprSectionHeader Text $$
+          then pprSectionHeader dspSection $$
                ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
       vcat (map (pprBasicBlock top_info) blocks) $$
-         -- above: Even the first block gets a label, because with branch-chain
-         -- elimination, it might be the target of a goto.
-            (if platformHasSubsectionsViaSymbols platform
-             then
-             -- See Note [Subsections Via Symbols]
-                      text "\t.long "
-                  <+> ppr info_lbl
-                  <+> char '-'
-                  <+> ppr (mkDeadStripPreventer info_lbl)
-             else empty) $$
+      -- above: Even the first block gets a label, because with branch-chain
+      -- elimination, it might be the target of a goto.
+      (if platformHasSubsectionsViaSymbols platform
+       then -- See Note [Subsections Via Symbols]
+                text "\t.long "
+            <+> ppr info_lbl
+            <+> char '-'
+            <+> ppr (mkDeadStripPreventer info_lbl)
+       else empty) $$
       (if gopt Opt_Debug dflags
        then ppr (mkAsmTempEndLabel info_lbl) <> char ':' else empty) $$
       pprSizeDecl info_lbl
+
+dspSection :: Section
+dspSection = Section Text $
+    panic "subsections-via-symbols doesn't combine with split-sections"
 
 -- | Output the ELF .size directive.
 pprSizeDecl :: CLabel -> SDoc
 pprSizeDecl lbl
  = sdocWithPlatform $ \platform ->
    if osElfTarget (platformOS platform)
-   then ptext (sLit "\t.size") <+> ppr lbl
-     <> ptext (sLit ", .-") <> ppr lbl
+   then ptext (sLit "\t.size") <+> ppr lbl <> ptext (sLit ", .-") <> ppr lbl
    else empty
 
 pprBasicBlock :: BlockEnv CmmStatics -> NatBasicBlock Instr -> SDoc
@@ -113,7 +118,8 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
        Just (Statics info_lbl info) ->
-           pprSectionHeader Text $$
+           -- FIXME A "pprSectionHeader Text" got lost here. Is it possible
+           -- that we get here after switching to a data section?
            infoTableLoc $$
            vcat (map pprData info) $$
            pprLabel info_lbl
@@ -386,54 +392,65 @@ pprAddr (AddrBaseIndex base index displacement)
 
 
 pprSectionHeader :: Section -> SDoc
-pprSectionHeader seg =
+pprSectionHeader (Section t suffix) = sdocWithPlatform $ \platform ->
+ let darwin = platformOS platform == OSDarwin
+     header | darwin = pprDarwinSectionHeader t
+            | otherwise = pprGNUSectionHeader t suffix
+ in  vcat [header
+          ,text ".align " <> pprSectionAlign t]
+
+pprSectionAlign :: SectionType -> SDoc
+pprSectionAlign (OtherSection _) =
+ panic "X86.Ppr.pprSectionAlign: unknown section"
+pprSectionAlign seg =
  sdocWithPlatform $ \platform ->
  case platformOS platform of
  OSDarwin
   | target32Bit platform ->
      case seg of
-      Text              -> text ".text\n\t.align 2"
-      Data              -> text ".data\n\t.align 2"
-      ReadOnlyData      -> text ".const\n\t.align 2"
-      RelocatableReadOnlyData
-                        -> text ".const_data\n\t.align 2"
-      UninitialisedData -> text ".data\n\t.align 2"
-      ReadOnlyData16    -> text ".const\n\t.align 4"
-      OtherSection _    -> panic "X86.Ppr.pprSectionHeader: unknown section"
+      ReadOnlyData16    -> int 4
+      _                 -> int 2
   | otherwise ->
      case seg of
-      Text              -> text ".text\n\t.align 3"
-      Data              -> text ".data\n\t.align 3"
-      ReadOnlyData      -> text ".const\n\t.align 3"
-      RelocatableReadOnlyData
-                        -> text ".const_data\n\t.align 3"
-      UninitialisedData -> text ".data\n\t.align 3"
-      ReadOnlyData16    -> text ".const\n\t.align 4"
-      OtherSection _    -> panic "PprMach.pprSectionHeader: unknown section"
+      ReadOnlyData16    -> int 4
+      _                 -> int 3
  _
   | target32Bit platform ->
      case seg of
-      Text              -> text ".text\n\t.align 4,0x90"
-      Data              -> text ".data\n\t.align 4"
-      ReadOnlyData      -> text ".section .rodata\n\t.align 4"
-      RelocatableReadOnlyData
-                        -> text ".section .data\n\t.align 4"
-      UninitialisedData -> text ".section .bss\n\t.align 4"
-      ReadOnlyData16    -> text ".section .rodata\n\t.align 16"
-      OtherSection _    -> panic "X86.Ppr.pprSectionHeader: unknown section"
+      Text              -> text "4,0x90"
+      ReadOnlyData16    -> int 16
+      _                 -> int 4
   | otherwise ->
      case seg of
-      Text              -> text ".text\n\t.align 8"
-      Data              -> text ".data\n\t.align 8"
-      ReadOnlyData      -> text ".section .rodata\n\t.align 8"
-      RelocatableReadOnlyData
-                        -> text ".section .data\n\t.align 8"
-      UninitialisedData -> text ".section .bss\n\t.align 8"
-      ReadOnlyData16    -> text ".section .rodata.cst16\n\t.align 16"
-      OtherSection _    -> panic "PprMach.pprSectionHeader: unknown section"
+      ReadOnlyData16    -> int 16
+      _                 -> int 8
 
+pprGNUSectionHeader :: SectionType -> CLabel -> SDoc
+pprGNUSectionHeader t suffix = sdocWithDynFlags $ \dflags ->
+  let splitSections = gopt Opt_SplitSections dflags
+      subsection | splitSections = text "." <> ppr suffix
+                 | otherwise     = text "" -- empty doc?
+  in  text ".section " <> text header <> subsection
+  where
+    header = case t of
+     Text -> ".text"
+     Data -> ".data"
+     ReadOnlyData -> ".rodata"
+     RelocatableReadOnlyData -> ".data.rel.ro"
+     UninitialisedData -> ".bss"
+     ReadOnlyData16 -> ".rodata.cst16"
+     OtherSection _ -> panic "X86.Ppr.pprGNUSectionHeader: unknown section type"
 
-
+pprDarwinSectionHeader :: SectionType -> SDoc
+pprDarwinSectionHeader t =
+  text $ case t of
+     Text -> ".text"
+     Data -> ".data"
+     ReadOnlyData -> ".const"
+     RelocatableReadOnlyData -> ".const_data"
+     UninitialisedData -> ".data"
+     ReadOnlyData16 -> ".const"
+     OtherSection _ -> panic "X86.Ppr.pprDarwinSectionHeader: unknown section type"
 
 pprDataItem :: CmmLit -> SDoc
 pprDataItem lit = sdocWithDynFlags $ \dflags -> pprDataItem' dflags lit

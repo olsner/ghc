@@ -14,3 +14,9 @@ that all the `iTableSuf` symbols are marked as used.
 As of this writing the documentation regarding the
 .subsections_via_symbols and -dead_stip can be found at
 <https://developer.apple.com/library/mac/documentation/DeveloperTools/Reference/Assembler/040-Assembler_Directives/asm_directives.html#//apple_ref/doc/uid/TP30000823-TPXREF101>
+
+Note that the info tables can't simply be kept using .no_dead_strip, since
+this would keep even the unused info tables, which prevents the dead stripping
+we want!
+Instead, the end of each entry point has a dummy word referencing the _dsp
+symbol and keeping the table alive iff the entry point is also referenced.

@@ -52,13 +52,14 @@ genLlvmData (sec, Statics lbl xs) = do
 
 -- | Should a data in this section be considered constant
 isSecConstant :: Section -> Bool
-isSecConstant Text                    = True
-isSecConstant ReadOnlyData            = True
-isSecConstant RelocatableReadOnlyData = True
-isSecConstant ReadOnlyData16          = True
-isSecConstant Data                    = False
-isSecConstant UninitialisedData       = False
-isSecConstant (OtherSection _)        = False
+isSecConstant (Section t _) = case t of
+    Text                    -> True
+    ReadOnlyData            -> True
+    RelocatableReadOnlyData -> True
+    ReadOnlyData16          -> True
+    Data                    -> False
+    UninitialisedData       -> False
+    (OtherSection _)        -> False
 
 
 -- ----------------------------------------------------------------------------

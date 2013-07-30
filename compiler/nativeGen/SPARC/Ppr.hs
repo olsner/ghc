@@ -62,28 +62,31 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
          []     -> -- special case for split markers:
            pprLabel lbl
          blocks -> -- special case for code without info table:
-           pprSectionHeader Text $$
+           pprSectionHeader (Section Text lbl) $$
            pprLabel lbl $$ -- blocks guaranteed not null, so label needed
            vcat (map (pprBasicBlock top_info) blocks)
 
     Just (Statics info_lbl _) ->
       sdocWithPlatform $ \platform ->
       (if platformHasSubsectionsViaSymbols platform
-          then pprSectionHeader Text $$
+          then pprSectionHeader dspSection $$
                ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
       vcat (map (pprBasicBlock top_info) blocks) $$
-         -- above: Even the first block gets a label, because with branch-chain
-         -- elimination, it might be the target of a goto.
-            (if platformHasSubsectionsViaSymbols platform
-             then
-             -- See Note [Subsections Via Symbols]
-                      text "\t.long "
-                  <+> ppr info_lbl
-                  <+> char '-'
-                  <+> ppr (mkDeadStripPreventer info_lbl)
-             else empty)
+      -- above: Even the first block gets a label, because with branch-chain
+      -- elimination, it might be the target of a goto.
+      (if platformHasSubsectionsViaSymbols platform
+       then
+       -- See Note [Subsections Via Symbols]
+                text "\t.long "
+            <+> ppr info_lbl
+            <+> char '-'
+            <+> ppr (mkDeadStripPreventer info_lbl)
+       else empty)
 
+dspSection :: Section
+dspSection = Section Text $
+    panic "subsections-via-symbols doesn't combine with split-sections"
 
 pprBasicBlock :: BlockEnv CmmStatics -> NatBasicBlock Instr -> SDoc
 pprBasicBlock info_env (BasicBlock blockid instrs)
@@ -94,7 +97,7 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
        Just (Statics info_lbl info) ->
-           pprSectionHeader Text $$
+           pprSectionHeader (Section Text info_lbl) $$
            vcat (map pprData info) $$
            pprLabel info_lbl
 
@@ -321,7 +324,7 @@ pprImm imm
 --      incase we store doubles in them.
 --
 pprSectionHeader :: Section -> SDoc
-pprSectionHeader seg = case seg of
+pprSectionHeader (Section seg _) = case seg of
   Text              -> text ".text\n\t.align 4"
   Data              -> text ".data\n\t.align 8"
   ReadOnlyData      -> text ".text\n\t.align 8"
@@ -330,7 +333,6 @@ pprSectionHeader seg = case seg of
   UninitialisedData -> text ".bss\n\t.align 8"
   ReadOnlyData16    -> text ".data\n\t.align 16"
   OtherSection _    -> panic "PprMach.pprSectionHeader: unknown section"
-
 
 -- | Pretty print a data item.
 pprDataItem :: CmmLit -> SDoc

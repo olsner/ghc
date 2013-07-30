@@ -59,7 +59,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
          []     -> -- special case for split markers:
            pprLabel lbl
          blocks -> -- special case for code without info table:
-           pprSectionHeader Text $$
+           pprSectionHeader (Section Text lbl) $$
            (case platformArch platform of
               ArchPPC_64 ELF_V1 -> pprFunctionDescriptor lbl
               ArchPPC_64 ELF_V2 -> pprFunctionPrologue lbl
@@ -70,20 +70,24 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
     Just (Statics info_lbl _) ->
       sdocWithPlatform $ \platform ->
       (if platformHasSubsectionsViaSymbols platform
-          then pprSectionHeader Text $$
+          then pprSectionHeader dspSection $$
                ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
       vcat (map (pprBasicBlock top_info) blocks) $$
-         -- above: Even the first block gets a label, because with branch-chain
-         -- elimination, it might be the target of a goto.
-            (if platformHasSubsectionsViaSymbols platform
-             then
-             -- See Note [Subsections Via Symbols]
-                      text "\t.long "
-                  <+> ppr info_lbl
-                  <+> char '-'
-                  <+> ppr (mkDeadStripPreventer info_lbl)
-             else empty)
+      -- above: Even the first block gets a label, because with branch-chain
+      -- elimination, it might be the target of a goto.
+      (if platformHasSubsectionsViaSymbols platform
+       then
+       -- See Note [Subsections Via Symbols]
+                text "\t.long "
+            <+> ppr info_lbl
+            <+> char '-'
+            <+> ppr (mkDeadStripPreventer info_lbl)
+       else empty)
+
+dspSection :: Section
+dspSection = Section Text $
+    panic "subsections-via-symbols doesn't combine with split-sections"
 
 
 pprFunctionDescriptor :: CLabel -> SDoc
@@ -124,7 +128,7 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
        Just (Statics info_lbl info) ->
-           pprSectionHeader Text $$
+           pprSectionHeader (Section Text info_lbl) $$
            vcat (map pprData info) $$
            pprLabel info_lbl
 
@@ -315,7 +319,7 @@ pprAddr (AddrRegImm r1 imm) = hcat [ pprImm imm, char '(', pprReg r1, char ')' ]
 
 
 pprSectionHeader :: Section -> SDoc
-pprSectionHeader seg =
+pprSectionHeader (Section seg _) =
  sdocWithPlatform $ \platform ->
  let osDarwin = platformOS platform == OSDarwin
      ppc64    = not $ target32Bit platform

@@ -1905,6 +1905,12 @@ linkBinary' staticLink dflags o_files dep_packages = do
                           then ["-Wl,-read_only_relocs,suppress"]
                           else [])
 
+                      -- Note [Options for gc-sections]
+                      --
+                      -- TODO: Needs to check for GNU ld/gold, as I don't think
+                      -- other linkers have this flag.
+                      ++ ["-Wl,--gc-sections"]
+
                       ++ o_files
                       ++ lib_path_opts)
                       ++ extra_ld_inputs
@@ -1918,6 +1924,20 @@ linkBinary' staticLink dflags o_files dep_packages = do
                       ++ debug_opts
                       ++ thread_opts
                     ))
+
+-- Note [Options for gc-sections]
+-- * always-on: small risk of breaking more or less obscure combinations
+--   of Haskell and foreign code. (Native code produced such that
+--   gc-sections removes something unexpectedly.)
+-- * controlled by -split-sections: if the libraries are compiled with
+--   split sections, the gc-sections is required to gain space, but the
+--   final program might not want/need the split sections.
+-- * never on: you need to add "-optl-Wl,--gc-sections" manually. This
+--   seems pretty obscure and hard to discover.
+--
+-- Unless we find real problems caused by (1) above, always-on seems
+-- the most usable option.
+--
 
 exeFileName :: Bool -> DynFlags -> FilePath
 exeFileName staticLink dflags
