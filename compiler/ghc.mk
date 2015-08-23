@@ -535,6 +535,7 @@ compiler_stage2_dll0_MODULES = \
 	Lexer \
 	ListSetOps \
 	Literal \
+	LZ4 \
 	Maybes \
 	MkCore \
 	MkId \
