@@ -1117,7 +1117,8 @@ runPhase (RealPhase cc_phase) input_fn dflags
 
         let split_objs = gopt Opt_SplitObjs dflags
             split_opt | hcc && split_objs = [ "-DUSE_SPLIT_MARKERS" ]
-                      | otherwise         = [ ]
+                      | otherwise         = [ "-ffunction-sections"
+                                            , "-fdata-sections" ]
 
         let cc_opt | optLevel dflags >= 2 = [ "-O2" ]
                    | optLevel dflags >= 1 = [ "-O" ]
