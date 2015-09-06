@@ -46,6 +46,10 @@ dwarfGen df modLoc us blocks = do
         , dwName = fromMaybe "" (ml_hs_file modLoc)
         , dwCompDir = addTrailingPathSeparator compPath
         , dwProducer = cProjectName ++ " " ++ cProjectVersion
+        -- TODO: is this correct, or do we need separate compile unit entries
+        -- for each code section or something? The assembly generation is fine
+        -- since there is no arithmetic between the two labels, so it will
+        -- work regardless of which section the labels are in.
         , dwLowLabel = lowLabel
         , dwHighLabel = highLabel
         , dwLineLabel = dwarfLineLabel
@@ -84,9 +88,15 @@ dwarfGen df modLoc us blocks = do
 
   -- .aranges section: Information about the bounds of compilation units
   let aranges = dwarfARangesSection $$
-                pprDwarfARange (DwarfARange lowLabel highLabel unitU)
+                pprDwarfARanges (map mkDwarfARange procs) unitU
 
   return (infoSct $$ abbrevSct $$ lineSct $$ frameSct $$ aranges, us'')
+
+mkDwarfARange :: DebugBlock -> DwarfARange
+mkDwarfARange proc = DwarfARange start end
+  where
+    start = dblCLabel proc
+    end = mkAsmTempEndLabel start
 
 -- | Header for a compilation unit, establishing global format
 -- parameters
