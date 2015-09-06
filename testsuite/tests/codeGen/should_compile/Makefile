@@ -5,6 +5,9 @@ include $(TOP)/mk/test.mk
 T2578:
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make T2578 -fforce-recomp -v0
 
+debug-save-temps:
+	'$(TEST_HC)' $(TEST_HC_OPTS) debug -fforce-recomp -g -keep-tmp-files -tmpdir tmp
+
 debug:
 	# Without optimisations, we should get annotations for basically
 	# all expressions in the example program.
