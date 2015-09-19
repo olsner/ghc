@@ -321,6 +321,10 @@ ifeq "$(BeConservative)" "YES"
 rts_CC_OPTS += -DBE_CONSERVATIVE
 endif
 
+ifeq "$(SplitSections)" "YES"
+rts_CC_OPTS += -ffunction-sections -fdata-sections
+endif
+
 #-----------------------------------------------------------------------------
 # Flags for compiling specific files
 rts/RtsMessages_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"

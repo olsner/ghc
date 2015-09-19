@@ -15,6 +15,7 @@ import LlvmCodeGen.Base
 import BlockId
 import CLabel
 import Cmm
+import DynFlags
 
 import FastString
 import Outputable
@@ -36,6 +37,7 @@ genLlvmData :: (Section, CmmStatics) -> LlvmM LlvmData
 genLlvmData (sec, Statics lbl xs) = do
     label <- strCLabel_llvm lbl
     static <- mapM genData xs
+    lmsec <- llvmSection sec
     let types   = map getStatType static
 
         strucTy = LMStruct types
@@ -45,21 +47,44 @@ genLlvmData (sec, Statics lbl xs) = do
         link           = if (externallyVisibleCLabel lbl)
                             then ExternallyVisible else Internal
         const          = if isSecConstant sec then Constant else Global
-        varDef         = LMGlobalVar label tyAlias link Nothing Nothing const
+        varDef         = LMGlobalVar label tyAlias link lmsec Nothing const
         globDef        = LMGlobal varDef struct
 
     return ([globDef], [tyAlias])
 
 -- | Should a data in this section be considered constant
 isSecConstant :: Section -> Bool
-isSecConstant Text                    = True
-isSecConstant ReadOnlyData            = True
-isSecConstant RelocatableReadOnlyData = True
-isSecConstant ReadOnlyData16          = True
-isSecConstant Data                    = False
-isSecConstant UninitialisedData       = False
-isSecConstant (OtherSection _)        = False
+isSecConstant (Section t _) = case t of
+    Text                    -> True
+    ReadOnlyData            -> True
+    RelocatableReadOnlyData -> True
+    ReadOnlyData16          -> True
+    Data                    -> False
+    UninitialisedData       -> False
+    (OtherSection _)        -> False
 
+-- Assumes that we only try to use section splitting on platforms with
+-- compatible section naming and toolchain :)
+llvmSectionType :: SectionType -> String
+llvmSectionType t = case t of
+    Text                    -> ".text"
+    ReadOnlyData            -> ".rodata"
+    RelocatableReadOnlyData -> ".data.rel.ro"
+    ReadOnlyData16          -> ".rodata.cst16"
+    Data                    -> ".data"
+    UninitialisedData       -> ".bss"
+    (OtherSection _)        -> panic "llvmSectionType: unknown section type"
+
+llvmSection :: Section -> LlvmM LMSection
+llvmSection (Section t suffix) = do
+  dflags <- getDynFlags
+  let splitSect = gopt Opt_SplitSections dflags
+  if not splitSect
+  then return Nothing
+  else do
+    lmsuffix <- strCLabel_llvm suffix
+    let sectype = llvmSectionType t
+    return (Just (concatFS [fsLit sectype, fsLit ".", lmsuffix]))
 
 -- ----------------------------------------------------------------------------
 -- * Generate static data

@@ -7,18 +7,7 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module PPC.Ppr (
-        pprNatCmmDecl,
-        pprBasicBlock,
-        pprSectionHeader,
-        pprData,
-        pprInstr,
-        pprFormat,
-        pprImm,
-        pprDataItem,
-)
-
-where
+module PPC.Ppr (pprNatCmmDecl) where
 
 import PPC.Regs
 import PPC.Instr
@@ -49,7 +38,7 @@ import Data.Bits
 
 pprNatCmmDecl :: NatCmmDecl CmmStatics Instr -> SDoc
 pprNatCmmDecl (CmmData section dats) =
-  pprSectionHeader section $$ pprDatas dats
+  pprSectionAlign section $$ pprDatas dats
 
 pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   case topInfoTable proc of
@@ -59,7 +48,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
          []     -> -- special case for split markers:
            pprLabel lbl
          blocks -> -- special case for code without info table:
-           pprSectionHeader Text $$
+           pprSectionAlign (Section Text lbl) $$
            (case platformArch platform of
               ArchPPC_64 ELF_V1 -> pprFunctionDescriptor lbl
               ArchPPC_64 ELF_V2 -> pprFunctionPrologue lbl
@@ -70,20 +59,24 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
     Just (Statics info_lbl _) ->
       sdocWithPlatform $ \platform ->
       (if platformHasSubsectionsViaSymbols platform
-          then pprSectionHeader Text $$
+          then pprSectionAlign dspSection $$
                ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
       vcat (map (pprBasicBlock top_info) blocks) $$
-         -- above: Even the first block gets a label, because with branch-chain
-         -- elimination, it might be the target of a goto.
-            (if platformHasSubsectionsViaSymbols platform
-             then
-             -- See Note [Subsections Via Symbols]
-                      text "\t.long "
-                  <+> ppr info_lbl
-                  <+> char '-'
-                  <+> ppr (mkDeadStripPreventer info_lbl)
-             else empty)
+      -- above: Even the first block gets a label, because with branch-chain
+      -- elimination, it might be the target of a goto.
+      (if platformHasSubsectionsViaSymbols platform
+       then
+       -- See Note [Subsections Via Symbols]
+                text "\t.long "
+            <+> ppr info_lbl
+            <+> char '-'
+            <+> ppr (mkDeadStripPreventer info_lbl)
+       else empty)
+
+dspSection :: Section
+dspSection = Section Text $
+    panic "subsections-via-symbols doesn't combine with split-sections"
 
 
 pprFunctionDescriptor :: CLabel -> SDoc
@@ -124,7 +117,7 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
        Just (Statics info_lbl info) ->
-           pprSectionHeader Text $$
+           pprSectionAlign (Section Text info_lbl) $$
            vcat (map pprData info) $$
            pprLabel info_lbl
 
@@ -314,34 +307,35 @@ pprAddr (AddrRegImm r1 (ImmInteger i)) = hcat [ integer i, char '(', pprReg r1, 
 pprAddr (AddrRegImm r1 imm) = hcat [ pprImm imm, char '(', pprReg r1, char ')' ]
 
 
-pprSectionHeader :: Section -> SDoc
-pprSectionHeader seg =
+pprSectionAlign :: Section -> SDoc
+pprSectionAlign sec@(Section seg _) =
  sdocWithPlatform $ \platform ->
  let osDarwin = platformOS platform == OSDarwin
      ppc64    = not $ target32Bit platform
  in
+ pprSectionHeader platform sec $$
  case seg of
-  Text              -> text ".text\n\t.align 2"
+  Text              -> text ".align 2"
   Data
-   | ppc64          -> text ".data\n.align 3"
-   | otherwise      -> text ".data\n.align 2"
+   | ppc64          -> text ".align 3"
+   | otherwise      -> text ".align 2"
   ReadOnlyData
-   | osDarwin       -> text ".const\n\t.align 2"
-   | ppc64          -> text ".section .rodata\n\t.align 3"
-   | otherwise      -> text ".section .rodata\n\t.align 2"
+   | osDarwin       -> text ".align 2"
+   | ppc64          -> text ".align 3"
+   | otherwise      -> text ".align 2"
   RelocatableReadOnlyData
-   | osDarwin       -> text ".const_data\n\t.align 2"
-   | ppc64          -> text ".data\n\t.align 3"
-   | otherwise      -> text ".data\n\t.align 2"
+   | osDarwin       -> text ".align 2"
+   | ppc64          -> text ".align 3"
+   | otherwise      -> text ".align 2"
   UninitialisedData
-   | osDarwin       -> text ".const_data\n\t.align 2"
-   | ppc64          -> text ".section .bss\n\t.align 3"
-   | otherwise      -> text ".section .bss\n\t.align 2"
+   | osDarwin       -> text ".align 2"
+   | ppc64          -> text ".align 3"
+   | otherwise      -> text ".align 2"
   ReadOnlyData16
-   | osDarwin       -> text ".const\n\t.align 4"
-   | otherwise      -> text ".section .rodata\n\t.align 4"
+   | osDarwin       -> text ".align 4"
+   | otherwise      -> text ".align 4"
   OtherSection _ ->
-      panic "PprMach.pprSectionHeader: unknown section"
+      panic "PprMach.pprSectionAlign: unknown section"
 
 
 pprDataItem :: CmmLit -> SDoc

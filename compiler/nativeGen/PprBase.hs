@@ -10,10 +10,17 @@ module PprBase (
         castFloatToWord8Array,
         castDoubleToWord8Array,
         floatToBytes,
-        doubleToBytes
+        doubleToBytes,
+        pprSectionHeader
 )
 
 where
+
+import CLabel
+import Cmm
+import DynFlags
+import Outputable
+import Platform
 
 import qualified Data.Array.Unsafe as U ( castSTUArray )
 import Data.Array.ST
@@ -70,3 +77,45 @@ doubleToBytes d
         i7 <- readArray arr 7
         return (map fromIntegral [i0,i1,i2,i3,i4,i5,i6,i7])
      )
+
+-- ----------------------------------------------------------------------------
+-- Printing section headers.
+--
+-- If -split-section was specified, include the suffix label, otherwise just
+-- print the section type. For Darwin, where subsections-for-symbols are
+-- used instead, only print section type.
+
+pprSectionHeader :: Platform -> Section -> SDoc
+pprSectionHeader platform (Section t suffix) =
+ case platformOS platform of
+   OSDarwin -> pprDarwinSectionHeader t
+   _        -> pprGNUSectionHeader t suffix
+
+pprGNUSectionHeader :: SectionType -> CLabel -> SDoc
+pprGNUSectionHeader t suffix = sdocWithDynFlags $ \dflags ->
+  let splitSections = gopt Opt_SplitSections dflags
+      subsection | splitSections = text "." <> ppr suffix
+                 | otherwise     = text "" -- empty doc?
+  in  text ".section " <> text header <> subsection
+  where
+    header = case t of
+      Text -> ".text"
+      Data -> ".data"
+      ReadOnlyData -> ".rodata"
+      RelocatableReadOnlyData -> ".data.rel.ro"
+      UninitialisedData -> ".bss"
+      ReadOnlyData16 -> ".rodata.cst16"
+      OtherSection _ ->
+        panic "PprBase.pprGNUSectionHeader: unknown section type"
+
+pprDarwinSectionHeader :: SectionType -> SDoc
+pprDarwinSectionHeader t =
+  text $ case t of
+     Text -> ".text"
+     Data -> ".data"
+     ReadOnlyData -> ".const"
+     RelocatableReadOnlyData -> ".const_data"
+     UninitialisedData -> ".data"
+     ReadOnlyData16 -> ".const"
+     OtherSection _ ->
+       panic "PprBase.pprDarwinSectionHeader: unknown section type"

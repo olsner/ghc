@@ -105,6 +105,10 @@ linkingOptions =
          , flagDescription = "Split objects (for libraries)"
          , flagType = DynamicFlag
          }
+  , flag { flagName = "-split-objs"
+         , flagDescription = "Split sections"
+         , flagType = DynamicFlag
+         }
   , flag { flagName = "-static"
          , flagDescription = "Use static Haskell libraries"
          , flagType = DynamicFlag

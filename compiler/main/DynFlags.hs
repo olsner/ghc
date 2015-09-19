@@ -393,6 +393,7 @@ data GeneralFlag
    | Opt_EagerBlackHoling
    | Opt_NoHsMain
    | Opt_SplitObjs
+   | Opt_SplitSections
    | Opt_StgStats
    | Opt_HideAllPackages
    | Opt_PrintBindResult
@@ -1285,7 +1286,10 @@ wayUnsetGeneralFlags _ WayDyn      = [-- There's no point splitting objects
                                       -- when we're going to be dynamically
                                       -- linking. Plus it breaks compilation
                                       -- on OSX x86.
-                                      Opt_SplitObjs]
+                                      Opt_SplitObjs,
+                                      -- If splitobjs wasn't useful for this,
+                                      -- assume sections aren't either.
+                                      Opt_SplitSections]
 wayUnsetGeneralFlags _ WayProf     = []
 wayUnsetGeneralFlags _ WayEventLog = []
 
@@ -2326,6 +2330,8 @@ dynamic_flags = [
       (NoArg (if can_split
                 then setGeneralFlag Opt_SplitObjs
                 else addWarn "ignoring -fsplit-objs"))
+
+  , defGhcFlag "split-sections"     (NoArg (setGeneralFlag Opt_SplitSections))
 
         -------- ghc -M -----------------------------------------------------
   , defGhcFlag "dep-suffix"               (hasArg addDepSuffix)
