@@ -691,6 +691,10 @@ compiler_stage2_HC_OPTS += $(GhcHcOpts) $(GhcStage2HcOpts)
 compiler_stage3_HC_OPTS += $(GhcHcOpts) $(GhcStage3HcOpts)
 endif
 
+ICF_OPTS = -optl-fuse-ld=gold -optl-Wl,--icf=all -optl-Wl,--print-icf-sections
+compiler_stage2_HC_OPTS += $(ICF_OPTS)
+compiler_stage3_HC_OPTS += $(ICF_OPTS)
+
 ifneq "$(BINDIST)" "YES"
 
 compiler_stage2_TAGS_HC_OPTS = -package ghc
