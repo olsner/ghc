@@ -128,6 +128,8 @@ data Imm
   | ImmConstantSum Imm Imm
   | ImmConstantDiff Imm Imm
 
+instance Show Imm where
+  show _ = "Imm"
 
 strImmLit :: String -> Imm
 strImmLit s = ImmLit (text s)
@@ -153,9 +155,12 @@ litToImm _                   = panic "X86.Regs.litToImm: no match"
 data AddrMode
         = AddrBaseIndex EABase EAIndex Displacement
         | ImmAddr Imm Int
+        deriving Show
 
 data EABase       = EABaseNone  | EABaseReg Reg | EABaseRip
+        deriving Show
 data EAIndex      = EAIndexNone | EAIndex Reg Int
+        deriving Show
 type Displacement = Imm
 
 

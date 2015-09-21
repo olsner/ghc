@@ -239,6 +239,8 @@ data CLabel
 
   deriving (Eq, Ord)
 
+instance Show CLabel where
+  show _ = "CLabel{}"
 
 -- | Record where a foreign label is stored.
 data ForeignLabelSource

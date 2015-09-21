@@ -26,7 +26,7 @@ data Cond
         | OFLO
         | PARITY
         | NOTPARITY
-        deriving Eq
+        deriving (Eq,Show)
 
 condUnsigned :: Cond -> Bool
 condUnsigned GU  = True

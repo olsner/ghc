@@ -344,14 +344,22 @@ data Instr
         | XADD        Format Operand Operand -- src (r), dst (r/m)
         | CMPXCHG     Format Operand Operand -- src (r), dst (r/m), eax implicit
         | MFENCE
+        deriving Show
+
+instance Show Section where
+  show _ = "Section"
+instance Show CmmStatics where
+  show _ = "CmmStatics"
 
 data PrefetchVariant = NTA | Lvl0 | Lvl1 | Lvl2
+        deriving Show
 
 
 data Operand
         = OpReg  Reg            -- register
         | OpImm  Imm            -- immediate value
         | OpAddr AddrMode       -- memory reference
+        deriving Show
 
 
 
