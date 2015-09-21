@@ -63,7 +63,9 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
          blocks -> -- special case for code without info table:
            pprSectionAlign (Section Text lbl) $$
            pprLabel lbl $$ -- blocks guaranteed not null, so label needed
-           vcat (map (pprBasicBlock top_info) blocks) $$
+           pprBasicBlocks top_info blocks $$
+           -- Section might have changed. Don't align this time.
+           pprSectionHeader' (Section Text lbl) $$
            (if gopt Opt_Debug dflags
             then ppr (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
            pprSizeDecl lbl
@@ -75,7 +77,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
           then pprSectionAlign dspSection $$
                ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
-      vcat (map (pprBasicBlock top_info) blocks) $$
+      pprBasicBlocks top_info blocks $$
       -- above: Even the first block gets a label, because with branch-chain
       -- elimination, it might be the target of a goto.
       (if platformHasSubsectionsViaSymbols platform
@@ -85,6 +87,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
             <+> char '-'
             <+> ppr (mkDeadStripPreventer info_lbl)
        else empty) $$
+      pprSectionHeader platform (Section Text info_lbl) $$
       (if gopt Opt_Debug dflags
        then ppr (mkAsmTempEndLabel info_lbl) <> char ':' else empty) $$
       pprSizeDecl info_lbl
@@ -100,6 +103,28 @@ pprSizeDecl lbl
    if osElfTarget (platformOS platform)
    then ptext (sLit "\t.size") <+> ppr lbl <> ptext (sLit ", .-") <> ppr lbl
    else empty
+
+unconditionalJump (JMP _ _) = True
+unconditionalJump (JMP_TBL _ _ _ _) = True
+unconditionalJump _ = False
+
+noFallthrough :: NatBasicBlock Instr -> Bool
+noFallthrough (BasicBlock _ []) = True
+noFallthrough (BasicBlock _ instrs) = unconditionalJump (last instrs)
+
+pprBasicBlocks info_env bs = vcat (go False bs)
+  where
+    go _  []     = []
+    go ft (b:bs) = bb ft b : go (noFallthrough b) bs
+    bb True = pprBasicBlockSection info_env
+    bb False = pprBasicBlock info_env
+
+pprBasicBlockSection :: BlockEnv CmmStatics -> NatBasicBlock Instr -> SDoc
+pprBasicBlockSection info_env block@(BasicBlock blockid _)
+  = pprSectionAlign (Section Text asmLbl) $$
+    pprBasicBlock info_env block
+  where
+    asmLbl = mkAsmTempLabel (getUnique blockid)
 
 pprBasicBlock :: BlockEnv CmmStatics -> NatBasicBlock Instr -> SDoc
 pprBasicBlock info_env (BasicBlock blockid instrs)
@@ -384,6 +409,8 @@ pprAddr (AddrBaseIndex base index displacement)
     ppr_disp (ImmInt 0) = empty
     ppr_disp imm        = pprImm imm
 
+pprSectionHeader' = sdocWithPlatform . flip pprSectionHeader
+
 -- | Print section header and appropriate alignment for that section.
 pprSectionAlign :: Section -> SDoc
 pprSectionAlign (Section (OtherSection _) _) =
@@ -656,14 +683,14 @@ pprInstr (JXX cond blockid)
   = pprCondInstr (sLit "j") cond (ppr lab)
   where lab = mkAsmTempLabel (getUnique blockid)
 
-pprInstr        (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm imm)
+pprInstr (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm imm)
 
-pprInstr        (JMP (OpImm imm) _) = ptext (sLit "\tjmp ") <> pprImm imm
+pprInstr (JMP (OpImm imm) _) = ptext (sLit "\tjmp ") <> pprImm imm
 pprInstr (JMP op _)          = sdocWithPlatform $ \platform ->
                                ptext (sLit "\tjmp *")
                                    <> pprOperand (archWordFormat (target32Bit platform)) op
 pprInstr (JMP_TBL op _ _ _)  = pprInstr (JMP op [])
-pprInstr        (CALL (Left imm) _)    = ptext (sLit "\tcall ") <> pprImm imm
+pprInstr (CALL (Left imm) _)    = ptext (sLit "\tcall ") <> pprImm imm
 pprInstr (CALL (Right reg) _)   = sdocWithPlatform $ \platform ->
                                   ptext (sLit "\tcall *")
                                       <> pprReg (archWordFormat (target32Bit platform)) reg
