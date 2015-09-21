@@ -104,20 +104,34 @@ pprSizeDecl lbl
    then ptext (sLit "\t.size") <+> ppr lbl <> ptext (sLit ", .-") <> ppr lbl
    else empty
 
-unconditionalJump (JMP _ _) = True
-unconditionalJump (JMP_TBL _ _ _ _) = True
-unconditionalJump _ = False
+instrFallthrough (JMP _ _) = False
+instrFallthrough (JXX ALWAYS _) = False
+instrFallthrough (JMP_TBL _ _ _ _) = False
+instrFallthrough _ = True
 
-noFallthrough :: NatBasicBlock Instr -> Bool
-noFallthrough (BasicBlock _ []) = True
-noFallthrough (BasicBlock _ instrs) = unconditionalJump (last instrs)
+fallthrough :: NatBasicBlock Instr -> Bool -> Bool
+fallthrough (BasicBlock _ []) x = x
+fallthrough (BasicBlock _ instrs) _ = instrFallthrough (last instrs)
 
-pprBasicBlocks info_env bs = vcat (go False bs)
+pprBasicBlocks info_env bs = vcat (go True bs)
   where
     go _  []     = []
-    go ft (b:bs) = bb ft b : go (noFallthrough b) bs
-    bb True = pprBasicBlockSection info_env
-    bb False = pprBasicBlock info_env
+    go ft (b:bs) = c : bb ft b : c2 : go (fallthrough b ft) bs
+      where
+        c = pprComment (ptext (sLit "entry, fallthrough =") <+> ppr ft)
+        c2 = case b of
+          BasicBlock _ [] -> empty
+          BasicBlock _ instrs ->
+            let
+              lastI = last instrs
+              c = pprComment (pprInstr lastI <+> ptext (sLit (show lastI)) <+> ppr (instrFallthrough lastI))
+              c2 = pprComment (ptext (sLit "exit, fallthrough =") <+> ppr (fallthrough b ft))
+            in c $$ c2
+
+    bb False = pprBasicBlockSection info_env
+    bb True = pprBasicBlock info_env
+
+pprComment doc = ptext (sLit " /* ") <> doc <> ptext (sLit " */")
 
 pprBasicBlockSection :: BlockEnv CmmStatics -> NatBasicBlock Instr -> SDoc
 pprBasicBlockSection info_env block@(BasicBlock blockid _)
