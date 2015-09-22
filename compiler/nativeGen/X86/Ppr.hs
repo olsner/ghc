@@ -45,6 +45,7 @@ import Outputable
 import Data.Word
 
 import Data.Bits
+import Data.Maybe       (isJust)
 
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
@@ -109,14 +110,17 @@ instrFallthrough (JXX ALWAYS _) = False
 instrFallthrough (JMP_TBL _ _ _ _) = False
 instrFallthrough _ = True
 
-fallthrough :: NatBasicBlock Instr -> Bool -> Bool
-fallthrough (BasicBlock _ []) x = x
-fallthrough (BasicBlock _ instrs) _ = instrFallthrough (last instrs)
+fallthrough :: BlockEnv CmmStatics -> NatBasicBlock Instr -> Bool -> Bool
+fallthrough env (BasicBlock b instrs) x =
+  has_infotable || case instrs of
+    [] -> x
+    _  -> instrFallthrough (last instrs)
+  where has_infotable = isJust (mapLookup b env)
 
-pprBasicBlocks info_env bs = vcat (go True bs)
+pprBasicBlocks env bs = vcat (go True bs)
   where
     go _  []     = []
-    go ft (b:bs) = c : bb ft b : c2 : go (fallthrough b ft) bs
+    go ft (b:bs) = c : bb ft b : c2 : go (fallthrough env b ft) bs
       where
         c = pprComment (ptext (sLit "entry, fallthrough =") <+> ppr ft)
         c2 = case b of
@@ -125,11 +129,11 @@ pprBasicBlocks info_env bs = vcat (go True bs)
             let
               lastI = last instrs
               c = pprComment (pprInstr lastI <+> ptext (sLit (show lastI)) <+> ppr (instrFallthrough lastI))
-              c2 = pprComment (ptext (sLit "exit, fallthrough =") <+> ppr (fallthrough b ft))
+              c2 = pprComment (ptext (sLit "exit, fallthrough =") <+> ppr (fallthrough env b ft))
             in c $$ c2
 
-    bb False = pprBasicBlockSection info_env
-    bb True = pprBasicBlock info_env
+    bb False = pprBasicBlockSection env
+    bb True = pprBasicBlock env
 
 pprComment doc = ptext (sLit " /* ") <> doc <> ptext (sLit " */")
 
