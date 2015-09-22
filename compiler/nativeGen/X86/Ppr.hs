@@ -140,10 +140,11 @@ pprComment doc = ptext (sLit " /* ") <> doc <> ptext (sLit " */")
 
 pprBasicBlockSection :: BlockEnv CmmStatics -> NatBasicBlock Instr -> SDoc
 pprBasicBlockSection info_env block@(BasicBlock blockid _)
-  = ptext (sLit "ud2") $$
+  = --ptext (sLit "ud2") $$
+    --pprSectionHeader' (Section Text asmLbl) $$
     pprSectionAlign (Section Text asmLbl) $$
     -- ud2 to catch accidental fall-through
-    ptext (sLit "ud2") $$
+    --ptext (sLit "ud2") $$
     pprBasicBlock info_env block
   where
     asmLbl = mkAsmTempLabel (getUnique blockid)
@@ -162,6 +163,7 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
        Nothing   -> empty
        Just (Statics info_lbl info) ->
            infoTableLoc $$
+           --pprLabel (mkAsmTempDerivedLabel asmLbl (fsLit "_info_start")) $$
            vcat (map pprData info) $$
            pprLabel info_lbl
     -- Make sure the info table has the right .loc for the block
