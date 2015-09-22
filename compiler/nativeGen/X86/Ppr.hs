@@ -105,6 +105,7 @@ pprSizeDecl lbl
    then ptext (sLit "\t.size") <+> ppr lbl <> ptext (sLit ", .-") <> ppr lbl
    else empty
 
+instrFallthrough :: Instr -> Bool
 instrFallthrough (JMP _ _) = False
 instrFallthrough (JXX ALWAYS _) = False
 instrFallthrough (JXX_GBL ALWAYS _) = False
@@ -118,11 +119,15 @@ fallthrough env (BasicBlock b instrs) x =
     _  -> instrFallthrough (last instrs)
   where has_infotable = isJust (mapLookup b env)
 
+pprBasicBlocks :: BlockEnv CmmStatics -> [NatBasicBlock Instr] -> SDoc
 pprBasicBlocks env bs = vcat (go True bs)
   where
     go _  []     = []
     go ft (b:bs) = c : bb ft b : c2 : go (fallthrough env b ft) bs
       where
+        c = empty
+        c2 = empty
+        {-
         c = pprComment (ptext (sLit "entry, fallthrough =") <+> ppr ft)
         c2 = case b of
           BasicBlock _ [] -> empty
@@ -132,11 +137,13 @@ pprBasicBlocks env bs = vcat (go True bs)
               c = pprComment (pprInstr lastI <+> ptext (sLit (show lastI)) <+> ppr (instrFallthrough lastI))
               c2 = pprComment (ptext (sLit "exit, fallthrough =") <+> ppr (fallthrough env b ft))
             in c $$ c2
+            -}
 
     bb False = pprBasicBlockSection env
     bb True = pprBasicBlock env
 
-pprComment doc = ptext (sLit " /* ") <> doc <> ptext (sLit " */")
+--pprComment :: SDoc -> SDoc
+--pprComment doc = ptext (sLit " /* ") <> doc <> ptext (sLit " */")
 
 pprBasicBlockSection :: BlockEnv CmmStatics -> NatBasicBlock Instr -> SDoc
 pprBasicBlockSection info_env block@(BasicBlock blockid _)
@@ -433,6 +440,7 @@ pprAddr (AddrBaseIndex base index displacement)
     ppr_disp (ImmInt 0) = empty
     ppr_disp imm        = pprImm imm
 
+pprSectionHeader' :: Section -> SDoc
 pprSectionHeader' = sdocWithPlatform . flip pprSectionHeader
 
 -- | Print section header and appropriate alignment for that section.
