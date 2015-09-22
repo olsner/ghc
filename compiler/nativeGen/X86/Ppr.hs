@@ -107,6 +107,7 @@ pprSizeDecl lbl
 
 instrFallthrough (JMP _ _) = False
 instrFallthrough (JXX ALWAYS _) = False
+instrFallthrough (JXX_GBL ALWAYS _) = False
 instrFallthrough (JMP_TBL _ _ _ _) = False
 instrFallthrough _ = True
 
