@@ -139,7 +139,10 @@ pprComment doc = ptext (sLit " /* ") <> doc <> ptext (sLit " */")
 
 pprBasicBlockSection :: BlockEnv CmmStatics -> NatBasicBlock Instr -> SDoc
 pprBasicBlockSection info_env block@(BasicBlock blockid _)
-  = pprSectionAlign (Section Text asmLbl) $$
+  = ptext (sLit "ud2") $$
+    pprSectionAlign (Section Text asmLbl) $$
+    -- ud2 to catch accidental fall-through
+    ptext (sLit "ud2") $$
     pprBasicBlock info_env block
   where
     asmLbl = mkAsmTempLabel (getUnique blockid)
