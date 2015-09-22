@@ -1905,7 +1905,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
                           else [])
 
                       ++ (if sLdIsGnuLd mySettings
-                          then ["-Wl,--gc-sections"]
+                          then [] -- ["-Wl,--gc-sections"]
                           else [])
 
                       ++ o_files
