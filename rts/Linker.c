@@ -5642,6 +5642,11 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
                   return 0;
                }
                secno = shndx_table[ELF_R_SYM(info)];
+            } else {
+               // Seems prudent. There are things like SHN_ABS that would
+               // have a special meaning (not sure if that's in this context
+               // though...)
+               CHECK(secno < SHN_LORESERVE);
             }
             S = (Elf_Addr)
                 (ehdrC + shdr[ secno ].sh_offset
