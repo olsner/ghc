@@ -1541,6 +1541,7 @@ static int ghciInsertSymbolTable(
    HsBool weak,
    ObjectCode *owner)
 {
+   CHECK(*key);
    RtsSymbolInfo *pinfo = lookupStrHashTable(table, key);
    if (!pinfo) /* new entry */
    {
@@ -5464,21 +5465,16 @@ ocGetNames_ELF ( ObjectCode* oc )
          char  isLocal = FALSE; /* avoids uninit-var warning */
          HsBool isWeak = HS_BOOL_FALSE;
          char* ad      = NULL;
-         char* nm      = strtab + stab[j].st_name;
-         uint32_t   secno   = stab[j].st_shndx;
-
-         /* We need to look up the section index in SHT_SYMTAB_SHNDX. */
-         if (secno == SHN_XINDEX) {
-           if (!shndxTable) {
-             return 0;
-           }
-           secno = shndxTable[j];
-         }
+         char* nm      = stab[j].st_name ? strtab + stab[j].st_name : NULL;
+         uint16_t shndx = stab[j].st_shndx;
+         /* XINDEX is an escape value to allow for more than 64k sections.
+          * We need to look up the section index in SHT_SYMTAB_SHNDX. */
+         uint32_t secno = shndx == SHN_XINDEX ? shndxTable[j] : shndx;
 
          /* Figure out if we want to add it; if so, set ad to its
             address.  Otherwise leave ad == NULL. */
 
-         if (secno == SHN_COMMON) {
+         if (shndx == SHN_COMMON) {
             isLocal = FALSE;
             ad = stgCallocBytes(1, stab[j].st_size, "ocGetNames_ELF(COMMON)");
             /*
@@ -5494,12 +5490,14 @@ ocGetNames_ELF ( ObjectCode* oc )
                 || ELF_ST_BIND(stab[j].st_info)==STB_WEAK
               )
               /* and not an undefined symbol */
-              && secno != SHN_UNDEF
+              && shndx != SHN_UNDEF
               /* and not in a "special section" */
               /* (I'm not sure these special sections exist at all, according
                * to my manpage, "Every  symbol  table  entry  is "defined" in
                * relation to some section.") */
-              && (secno < SHN_LORESERVE || stab[j].st_shndx == SHN_XINDEX)
+              /* Note that the reserved index only refers to the st_shndx field,
+               * not the actual section number (if an escape was used). */
+              && (shndx < SHN_LORESERVE || shndx == SHN_XINDEX)
               &&
               /* and it's a not a section or string table or anything silly */
               ( ELF_ST_TYPE(stab[j].st_info)==STT_FUNC ||
@@ -5536,8 +5534,7 @@ ocGetNames_ELF ( ObjectCode* oc )
 
          /* And the decision is ... */
 
-         if (ad != NULL) {
-            ASSERT(nm != NULL);
+         if (ad != NULL && nm != NULL) {
             /* Acquire! */
             if (isLocal) {
                /* Ignore entirely. */
@@ -6257,7 +6254,7 @@ static int ocRunInit_ELF( ObjectCode *oc )
    char*     ehdrC = (char*)(oc->image);
    Elf_Ehdr* ehdr  = (Elf_Ehdr*) ehdrC;
    Elf_Shdr* shdr  = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
-   char* sh_strtab = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
+   char* sh_strtab = ehdrC + shdr[elf_shstrndx(ehdr)].sh_offset;
    int argc, envc;
    char **argv, **envv;
 
