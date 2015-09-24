@@ -5549,15 +5549,18 @@ ocGetNames_ELF ( ObjectCode* oc )
             /* Skip. */
             IF_DEBUG(linker,debugBelch( "skipping `%s'\n",
                                    strtab + stab[j].st_name ));
-            /*
-            debugBelch(
-                    "skipping   bind = %d,  type = %d,  shndx = %d   `%s'\n",
+#if 0
+            if (secno == 65376 || secno == 65522) {
+               char* secname = sh_strtab + shdr[secno].sh_name;
+               debugBelch(
+                    "skipping   bind = %d,  type = %d,  shndx = %u[%d] `%s'[%d] in %s\n",
                     (int)ELF_ST_BIND(stab[j].st_info),
                     (int)ELF_ST_TYPE(stab[j].st_info),
-                    (int)stab[j].st_shndx,
-                    strtab + stab[j].st_name
+                    secno, (int)stab[j].st_shndx,
+                    nm, stab[j].st_name, secname
                    );
-            */
+            }
+#endif
             oc->symbols[j] = NULL;
          }
 
