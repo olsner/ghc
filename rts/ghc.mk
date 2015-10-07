@@ -206,7 +206,7 @@ ifneq "$$(findstring dyn, $1)" ""
 ifeq "$$(HostOS_CPP)" "mingw32" 
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/dist/libs.depend rts/dist/build/$$(LIBFFI_DLL)
 	"$$(RM)" $$(RM_OPTS) $$@
-	"$$(rts_dist_HC)" -this-package-key rts -shared -dynamic -dynload deploy \
+	$$(call cmd,rts_dist_HC) -this-package-key rts -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages -Lrts/dist/build -l$$(LIBFFI_NAME) \
          `cat rts/dist/libs.depend` $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) \
          $$(rts_dist_$1_GHC_LD_OPTS) \
@@ -227,7 +227,7 @@ LIBFFI_LIBS =
 endif
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) rts/dist/libs.depend $$(rts_dist_FFI_SO)
 	"$$(RM)" $$(RM_OPTS) $$@
-	"$$(rts_dist_HC)" -this-package-key rts -shared -dynamic -dynload deploy \
+	$$(call cmd,rts_dist_HC) -this-package-key rts -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages $$(LIBFFI_LIBS) `cat rts/dist/libs.depend` $$(rts_$1_OBJS) \
           $$(rts_dist_$1_GHC_LD_OPTS) \
 	  $$(rts_$1_DTRACE_OBJS) -o $$@
@@ -235,7 +235,7 @@ endif
 else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
-	echo $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR_STAGE1)" \
+	echo $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) | $$(call log,AR_STAGE1) "$$(XARGS)" $$(XARGS_OPTS) "$$(AR_STAGE1)" \
 		$$(AR_OPTS_STAGE1) $$(EXTRA_AR_ARGS_STAGE1) $$@
 
 ifneq "$$(UseSystemLibFFI)" "YES"
