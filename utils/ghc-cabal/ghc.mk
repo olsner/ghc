@@ -26,6 +26,10 @@ ifneq "$(BINDIST)" "YES"
 $(ghc-cabal_INPLACE) : $(ghc-cabal_DIST_BINARY) | $$(dir $$@)/.
 	"$(CP)" $< $@
 
+ifneq "$(THREADS)" ""
+utils/ghc-cabal_dist_EXTRA_HC_OPTS += -j$(THREADS)
+endif
+
 $(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/Distribution/*/*/*.hs)
 $(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/Distribution/*/*.hs)
 $(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/Distribution/*.hs)
