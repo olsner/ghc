@@ -89,16 +89,26 @@
 # make doesn't think they are merely intermediate files, and doesn't
 # delete them.
 
-ifeq "$(ExtraMakefileSanityChecks)" "NO"
+# The parameters given to the macro:
+# $1 = hi-file targets, $2 = hi pattern, $3 = .o pattern, $4 = .hs source
 
-define hi-rule # $1 = rule header
-$1 ;
+ifeq "$(SeparateHiCompilation)" "YES"
+
+# In this case, don't generate any .hi-rule at all but instead have
+# build-package-way actually build .hi files with -fno-code -fwrite-interface.
+define hi-rule
+endef
+
+else ifeq "$(ExtraMakefileSanityChecks)" "NO"
+
+define hi-rule
+$1: $2: $3 ;
 endef
 
 else
 
-define hi-rule # $1 = rule header
-$1
+define hi-rule
+$1: $2: $3
 	@if [ ! -f $$@ ] ; then \
 	    echo "Panic! $$< exists, but $$@ does not."; \
 	    exit 1; \

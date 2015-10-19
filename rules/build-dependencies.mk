@@ -31,7 +31,7 @@ ifneq "$$(NO_GENERATED_MAKEFILE_RULES)" "YES"
 # indirectly) include the generated includes files.
 $$($1_$2_depfile_haskell) : $$(includes_H_CONFIG) $$(includes_H_PLATFORM)
 
-$$($1_$2_depfile_haskell) : $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS) $$$$($1_$2_HC_MK_DEPEND_DEP) | $$$$(dir $$$$@)/.
+$$($1_$2_depfile_haskell) : $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS) $$$$($1_$2_HC_MK_DEPEND_DEP) rules/build-dependencies.mk | $$$$(dir $$$$@)/.
 	$$(call removeFiles,$$@.tmp)
 ifneq "$$($1_$2_HS_SRCS)" ""
 	"$$($1_$2_HC_MK_DEPEND)" -M \
@@ -52,15 +52,19 @@ endif
 # Insert the calls to hi-rule. Basically, we look for the
 #     Foo.dyn_o Foo.o : Foo.hs
 # lines, and create corresponding hi-rule lines
-#     <dollar>(eval <dollar>(call hi-rule,Foo.dyn_hi Foo.hi : %hi: %o Foo.hs))
+#     <dollar>(eval <dollar>(call hi-rule,Foo.dyn_hi Foo.hi,%hi,%o,Foo.hs))
+# While we're at it, for each line A.o: B.hi we add a line A.hi: B.hi to
+# include required hi->hi dependencies.
 	sed -e '/hs$$$$/ p' -e '/hs$$$$/ s/o /hi /g' \
-             -e '/hs$$$$/ s/:/ : %hi: %o /'                       \
+             -e '/hs$$$$/ s/:/,%hi,%o,/'                          \
              -e '/hs$$$$/ s/^/$$$$(eval $$$$(call hi-rule,/'      \
              -e '/hs$$$$/ s/$$$$/))/'                             \
              -e '/hs-boot$$$$/ p' -e '/hs-boot$$$$/ s/o-boot /hi-boot /g' \
-             -e '/hs-boot$$$$/ s/:/ : %hi-boot: %o-boot /'        \
+             -e '/hs-boot$$$$/ s/:/,%hi-boot,%o-boot,/'           \
              -e '/hs-boot$$$$/ s/^/$$$$(eval $$$$(call hi-rule,/' \
              -e '/hs-boot$$$$/ s/$$$$/))/'                        \
+             -e '/hi\(-boot\)\?$$$$/ p'                            \
+             -e '/hi\(-boot\)\?$$$$/ s/o\(-boot\)\? :/hi\1 :/'      \
              $$@.tmp2 > $$@
 # Some of the C files (directly or indirectly) include the generated
 # includes files.
