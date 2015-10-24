@@ -1,4 +1,6 @@
-log=/usr/bin/time -a -f '%U %S $1 $($1):: $@: $^ ? $?' -o /tmp/mklog
+ifneq "$(MakeLogFile)" ""
+log=/usr/bin/time -a -f '%U %S $1 $($1):: $@: $^ ? $?' -o $(MakeLogFile)
+endif
 
 ifneq ($(V),1)
 cmd = @echo '  $(if $(label_$1),$(label_$1),$1) $@'; $(log) "$($1)"
