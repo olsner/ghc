@@ -94,9 +94,8 @@ endif
 
 
 # Catch make if it runs away into an infinite loop
-ifeq      "$(MAKE_RESTARTS)" ""
-else ifeq "$(MAKE_RESTARTS)" "1"
-else
+MAX_RESTARTS = 2
+ifeq      "$(MAKE_RESTARTS)" "$(MAX_RESTARTS)"
 $(error Make has restarted itself $(MAKE_RESTARTS) times; is there a makefile bug? See http://ghc.haskell.org/trac/ghc/wiki/Building/Troubleshooting#Makehasrestarteditself3timesisthereamakefilebug for details)
 endif
 
