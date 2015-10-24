@@ -90,13 +90,17 @@
 # delete them.
 
 # The parameters given to the macro:
-# $1 = hi-file targets, $2 = hi pattern, $3 = .o pattern, $4 = .hs source
+# $1 = hi-file target(s), $2 = hi pattern, $3 = .o pattern, $4 = .hs source
 
 ifeq "$(SeparateHiCompilation)" "YES"
 
-# In this case, don't generate any .hi-rule at all but instead have
-# build-package-way actually build .hi files with -fno-code -fwrite-interface.
+# In this case, build-package-way actually builds .hi files (with -fno-code
+# -fwrite-interface). But we want to order to building of the .o file to after
+# we've finished building the .hi file, so that we don't get fighting over who
+# writes the .hi file. And hopefully the .o compilation will find that it
+# doesn't need to write a new .hi file...
 define hi-rule
+$(patsubst $2,$3,$1): $3: | $2
 endef
 
 else ifeq "$(ExtraMakefileSanityChecks)" "NO"
