@@ -688,7 +688,7 @@ finishTypecheckOnly :: HscEnv
 finishTypecheckOnly hsc_env summary tc_result mb_old_hash = do
     let dflags = hsc_dflags hsc_env
     MASSERT( hscTarget dflags == HscNothing || ms_hsc_src summary == HsBootFile )
-    (iface, changed, details) <- liftIO $ hscSimpleIface hsc_env tc_result mb_old_hash
+    (iface, no_change, details) <- liftIO $ hscSimpleIface hsc_env tc_result mb_old_hash
     let hsc_status =
           case (hscTarget dflags, ms_hsc_src summary) of
             (HscNothing, _) -> HscNotGeneratingCode
@@ -698,7 +698,7 @@ finishTypecheckOnly hsc_env summary tc_result mb_old_hash = do
             HomeModInfo{ hm_details  = details,
                          hm_iface    = iface,
                          hm_linkable = Nothing },
-            changed)
+            no_change)
 
 -- Runs the post-typechecking frontend (desugar and simplify),
 -- and then generates and writes out the final interface. We want
@@ -726,14 +726,14 @@ finish hsc_env summary tc_result mb_old_hash = do
             changed)
 
 hscMaybeWriteIface :: DynFlags -> ModIface -> Bool -> ModSummary -> IO ()
-hscMaybeWriteIface dflags iface changed summary =
+hscMaybeWriteIface dflags iface no_change summary =
     let force_write_interface = gopt Opt_WriteInterface dflags
         write_interface = case hscTarget dflags of
                             HscNothing      -> False
                             HscInterpreted  -> False
                             _               -> True
     in when (write_interface || force_write_interface) $
-            hscWriteIface dflags iface changed summary
+            hscWriteIface dflags iface no_change summary
 
 --------------------------------------------------------------
 -- NoRecomp handlers
