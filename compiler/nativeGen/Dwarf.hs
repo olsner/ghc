@@ -83,8 +83,9 @@ dwarfGen df modLoc us blocks = do
                  pprDwarfFrame (debugFrame framesU procs)
 
   -- .aranges section: Information about the bounds of compilation units
-  let aranges = dwarfARangesSection $$
-                pprDwarfARanges (map mkDwarfARange procs) unitU
+  let aranges' | gopt Opt_SplitSections df = [DwarfARange lowLabel highLabel]
+               | otherwise                 = map mkDwarfARange procs
+  let aranges = dwarfARangesSection $$ pprDwarfARanges aranges' unitU
 
   return (infoSct $$ abbrevSct $$ lineSct $$ frameSct $$ aranges, us'')
 
