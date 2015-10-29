@@ -19,6 +19,7 @@ where
 import CLabel
 import Cmm
 import DynFlags
+import FastString
 import Outputable
 import Platform
 
@@ -94,28 +95,28 @@ pprSectionHeader platform (Section t suffix) =
 pprGNUSectionHeader :: SectionType -> CLabel -> SDoc
 pprGNUSectionHeader t suffix = sdocWithDynFlags $ \dflags ->
   let splitSections = gopt Opt_SplitSections dflags
-      subsection | splitSections = text "." <> ppr suffix
-                 | otherwise     = text "" -- empty doc?
-  in  text ".section " <> text header <> subsection
+      subsection | splitSections = char '.' <> ppr suffix
+                 | otherwise     = empty
+  in  ptext (sLit ".section ") <> ptext header <> subsection
   where
     header = case t of
-      Text -> ".text"
-      Data -> ".data"
-      ReadOnlyData -> ".rodata"
-      RelocatableReadOnlyData -> ".data.rel.ro"
-      UninitialisedData -> ".bss"
-      ReadOnlyData16 -> ".rodata.cst16"
+      Text -> sLit ".text"
+      Data -> sLit ".data"
+      ReadOnlyData -> sLit ".rodata"
+      RelocatableReadOnlyData -> sLit ".data.rel.ro"
+      UninitialisedData -> sLit ".bss"
+      ReadOnlyData16 -> sLit ".rodata.cst16"
       OtherSection _ ->
         panic "PprBase.pprGNUSectionHeader: unknown section type"
 
 pprDarwinSectionHeader :: SectionType -> SDoc
 pprDarwinSectionHeader t =
-  text $ case t of
-     Text -> ".text"
-     Data -> ".data"
-     ReadOnlyData -> ".const"
-     RelocatableReadOnlyData -> ".const_data"
-     UninitialisedData -> ".data"
-     ReadOnlyData16 -> ".const"
+  ptext $ case t of
+     Text -> sLit ".text"
+     Data -> sLit ".data"
+     ReadOnlyData -> sLit ".const"
+     RelocatableReadOnlyData -> sLit ".const_data"
+     UninitialisedData -> sLit ".data"
+     ReadOnlyData16 -> sLit ".const"
      OtherSection _ ->
        panic "PprBase.pprDarwinSectionHeader: unknown section type"

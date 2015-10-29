@@ -391,7 +391,7 @@ pprSectionAlign (Section (OtherSection _) _) =
 pprSectionAlign sec@(Section seg _) =
   sdocWithPlatform $ \platform ->
     pprSectionHeader platform sec $$
-    text ".align " <>
+    ptext (sLit ".align ") <>
     case platformOS platform of
       OSDarwin
        | target32Bit platform ->
@@ -405,7 +405,7 @@ pprSectionAlign sec@(Section seg _) =
       _
        | target32Bit platform ->
           case seg of
-           Text              -> text "4,0x90"
+           Text              -> ptext (sLit "4,0x90")
            ReadOnlyData16    -> int 16
            _                 -> int 4
        | otherwise ->

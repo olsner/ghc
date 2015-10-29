@@ -326,15 +326,15 @@ pprSectionAlign :: Section -> SDoc
 pprSectionAlign sec@(Section seg _) =
   sdocWithPlatform $ \platform ->
     pprSectionHeader platform sec $$
-    case seg of
-      Text              -> text ".align 4"
-      Data              -> text ".align 8"
-      ReadOnlyData      -> text ".align 8"
+    ptext (case seg of
+      Text              -> sLit ".align 4"
+      Data              -> sLit ".align 8"
+      ReadOnlyData      -> sLit ".align 8"
       RelocatableReadOnlyData
-                        -> text ".align 8"
-      UninitialisedData -> text ".align 8"
-      ReadOnlyData16    -> text ".align 16"
-      OtherSection _    -> panic "PprMach.pprSectionHeader: unknown section"
+                        -> sLit ".align 8"
+      UninitialisedData -> sLit ".align 8"
+      ReadOnlyData16    -> sLit ".align 16"
+      OtherSection _    -> panic "PprMach.pprSectionHeader: unknown section")
 
 -- | Pretty print a data item.
 pprDataItem :: CmmLit -> SDoc

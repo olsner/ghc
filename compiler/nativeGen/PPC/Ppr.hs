@@ -312,31 +312,28 @@ pprSectionAlign sec@(Section seg _) =
  sdocWithPlatform $ \platform ->
  let osDarwin = platformOS platform == OSDarwin
      ppc64    = not $ target32Bit platform
- in
- pprSectionHeader platform sec $$
- case seg of
-  Text              -> text ".align 2"
-  Data
-   | ppc64          -> text ".align 3"
-   | otherwise      -> text ".align 2"
-  ReadOnlyData
-   | osDarwin       -> text ".align 2"
-   | ppc64          -> text ".align 3"
-   | otherwise      -> text ".align 2"
-  RelocatableReadOnlyData
-   | osDarwin       -> text ".align 2"
-   | ppc64          -> text ".align 3"
-   | otherwise      -> text ".align 2"
-  UninitialisedData
-   | osDarwin       -> text ".align 2"
-   | ppc64          -> text ".align 3"
-   | otherwise      -> text ".align 2"
-  ReadOnlyData16
-   | osDarwin       -> text ".align 4"
-   | otherwise      -> text ".align 4"
-  OtherSection _ ->
-      panic "PprMach.pprSectionAlign: unknown section"
-
+     align    = ptext $ case seg of
+       Text              -> sLit ".align 2"
+       Data
+        | ppc64          -> sLit ".align 3"
+        | otherwise      -> sLit ".align 2"
+       ReadOnlyData
+        | osDarwin       -> sLit ".align 2"
+        | ppc64          -> sLit ".align 3"
+        | otherwise      -> sLit ".align 2"
+       RelocatableReadOnlyData
+        | osDarwin       -> sLit ".align 2"
+        | ppc64          -> sLit ".align 3"
+        | otherwise      -> sLit ".align 2"
+       UninitialisedData
+        | osDarwin       -> sLit ".align 2"
+        | ppc64          -> sLit ".align 3"
+        | otherwise      -> sLit ".align 2"
+       ReadOnlyData16
+        | osDarwin       -> sLit ".align 4"
+        | otherwise      -> sLit ".align 4"
+       OtherSection _    -> panic "PprMach.pprSectionAlign: unknown section"
+ in pprSectionHeader platform sec $$ align
 
 pprDataItem :: CmmLit -> SDoc
 pprDataItem lit
