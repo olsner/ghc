@@ -2331,7 +2331,14 @@ dynamic_flags = [
                 then setGeneralFlag Opt_SplitObjs
                 else addWarn "ignoring -fsplit-objs"))
 
-  , defGhcFlag "split-sections"     (NoArg (setGeneralFlag Opt_SplitSections))
+  , defGhcFlag "split-sections"
+      (noArgM (\dflags -> do
+        if platformHasSubsectionsViaSymbols (targetPlatform dflags)
+          then do addErr $
+                    "-split-sections is not useful on this platform " ++
+                    "since it always uses subsections via symbols."
+                  return dflags
+          else return (gopt_set dflags Opt_SplitSections)))
 
         -------- ghc -M -----------------------------------------------------
   , defGhcFlag "dep-suffix"               (hasArg addDepSuffix)
