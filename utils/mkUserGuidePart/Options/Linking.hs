@@ -105,8 +105,8 @@ linkingOptions =
          , flagDescription = "Split objects (for libraries)"
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-split-objs"
-         , flagDescription = "Split sections"
+  , flag { flagName = "-split-sections"
+         , flagDescription = "Split sections for link-time dead-code stripping"
          , flagType = DynamicFlag
          }
   , flag { flagName = "-static"

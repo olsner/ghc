@@ -623,9 +623,9 @@ for example).
     output file.
 
     When linking, the linker can automatically remove all unreferenced sections
-    and thus produce smaller executables. The effect is similar to -split-objs,
-    but somewhat more efficient - the generated library files are about 30%
-    smaller than with ``-split-objs``.
+    and thus produce smaller executables. The effect is similar to
+    ``-split-objs``, but somewhat more efficient - the generated library files
+    are about 30% smaller than with ``-split-objs``.
 
 ``-static``
     .. index::
