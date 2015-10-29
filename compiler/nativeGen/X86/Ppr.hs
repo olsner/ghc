@@ -72,8 +72,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
       sdocWithPlatform $ \platform ->
       pprSectionAlign (Section Text info_lbl) $$
       (if platformHasSubsectionsViaSymbols platform
-          then pprSectionAlign dspSection $$
-               ppr (mkDeadStripPreventer info_lbl) <> char ':'
+          then ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
       vcat (map (pprBasicBlock top_info) blocks) $$
       -- above: Even the first block gets a label, because with branch-chain
@@ -88,10 +87,6 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
       (if gopt Opt_Debug dflags
        then ppr (mkAsmTempEndLabel info_lbl) <> char ':' else empty) $$
       pprSizeDecl info_lbl
-
-dspSection :: Section
-dspSection = Section Text $
-    panic "subsections-via-symbols doesn't combine with split-sections"
 
 -- | Output the ELF .size directive.
 pprSizeDecl :: CLabel -> SDoc
