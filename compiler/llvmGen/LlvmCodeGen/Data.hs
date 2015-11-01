@@ -63,18 +63,18 @@ isSecConstant (Section t _) = case t of
     UninitialisedData       -> False
     (OtherSection _)        -> False
 
--- Assumes that we only try to use section splitting on platforms with
--- compatible section naming and toolchain :)
-llvmSectionType :: SectionType -> String
+-- | Format the section type part of a Cmm Section
+llvmSectionType :: SectionType -> FastString
 llvmSectionType t = case t of
-    Text                    -> ".text"
-    ReadOnlyData            -> ".rodata"
-    RelocatableReadOnlyData -> ".data.rel.ro"
-    ReadOnlyData16          -> ".rodata.cst16"
-    Data                    -> ".data"
-    UninitialisedData       -> ".bss"
+    Text                    -> fsLit ".text"
+    ReadOnlyData            -> fsLit ".rodata"
+    RelocatableReadOnlyData -> fsLit ".data.rel.ro"
+    ReadOnlyData16          -> fsLit ".rodata.cst16"
+    Data                    -> fsLit ".data"
+    UninitialisedData       -> fsLit ".bss"
     (OtherSection _)        -> panic "llvmSectionType: unknown section type"
 
+-- | Format a Cmm Section into a LLVM section name
 llvmSection :: Section -> LlvmM LMSection
 llvmSection (Section t suffix) = do
   dflags <- getDynFlags
@@ -83,8 +83,7 @@ llvmSection (Section t suffix) = do
   then return Nothing
   else do
     lmsuffix <- strCLabel_llvm suffix
-    let sectype = llvmSectionType t
-    return (Just (concatFS [fsLit sectype, fsLit ".", lmsuffix]))
+    return (Just (concatFS [llvmSectionType t, fsLit ".", lmsuffix]))
 
 -- ----------------------------------------------------------------------------
 -- * Generate static data
