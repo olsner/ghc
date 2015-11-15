@@ -658,8 +658,9 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
         Right (result, mb_old_hash) -> do
             (status, hmi, no_change) <- case result of
                 FrontendTypecheck tc_result ->
-                    if hscTarget dflags /= HscNothing &&
-                       ms_hsc_src mod_summary == HsSrcFile
+                    if (hscTarget dflags /= HscNothing &&
+                        ms_hsc_src mod_summary == HsSrcFile) ||
+                        gopt Opt_WriteInterface dflags
                        then finish              hsc_env mod_summary tc_result mb_old_hash
                        else finishTypecheckOnly hsc_env mod_summary tc_result mb_old_hash
                 FrontendMerge raw_iface ->
@@ -723,12 +724,16 @@ finish :: HscEnv
 finish hsc_env summary tc_result mb_old_hash = do
     let dflags = hsc_dflags hsc_env
     MASSERT( ms_hsc_src summary == HsSrcFile )
-    MASSERT( hscTarget dflags /= HscNothing )
+    MASSERT( hscTarget dflags /= HscNothing || gopt Opt_WriteInterface dflags )
     guts0 <- hscDesugar' (ms_location summary) tc_result
     guts <- hscSimplify' guts0
     (iface, changed, details, cgguts) <- liftIO $ hscNormalIface hsc_env guts mb_old_hash
 
-    return (HscRecomp cgguts summary,
+    let stat = case hscTarget dflags of
+            HscNothing -> HscNotGeneratingCode
+            _          -> HscRecomp cgguts summary
+
+    return (stat,
             HomeModInfo{ hm_details  = details,
                          hm_iface    = iface,
                          hm_linkable = Nothing },
