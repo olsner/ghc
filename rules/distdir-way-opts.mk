@@ -147,6 +147,10 @@ endif
 endif
 endif
 
+ifeq "$$($1_$2_SEPARATE_HI)" "YES"
+$1_$2_$3_O_HC_OPTS = -fno-interface
+endif
+
 $1_$2_$3_ALL_CC_OPTS = \
  $$(WAY_$3_CC_OPTS) \
  $$($1_$2_DIST_GCC_CC_OPTS) \

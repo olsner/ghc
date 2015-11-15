@@ -18,7 +18,7 @@ ifneq "$$(BINDIST)" "YES"
 
 # Compiling Haskell source
 
-ifeq "$(SeparateHiCompilation)" "YES"
+ifeq "$$($1_$2_SEPARATE_HI)" "YES"
 $1/$2/build/%.$$($3_hisuf) : $1/$4/%.hs $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP) $$($1_$2_PKGDATA_DEP)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf),$$(basename $$@))) -fno-code -fwrite-interface
 	$$(call ohi-sanity-check,$1,$2,$3,$1/$2/build/$$*)
@@ -42,10 +42,10 @@ $1/$2/build/%.$$($3_hcsuf) : $1/$4/%.lhs $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP) 
 # .hs->.o rule, I don't know why --SDM
 
 $1/$2/build/%.$$($3_osuf) : $1/$4/%.hc includes/ghcautoconf.h includes/ghcplatform.h | $$$$(dir $$$$@)/.
-	$$(call cmd,$1_$2_CC) $$($1_$2_$3_ALL_CC_OPTS) $$(addprefix -I,$$(GHC_INCLUDE_DIRS)) -x c -c $$< -o $$@ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf),$$(basename $$@))) -fno-write-interface
+	$$(call cmd,$1_$2_CC) $$($1_$2_$3_ALL_CC_OPTS) $$(addprefix -I,$$(GHC_INCLUDE_DIRS)) -x c -c $$< -o $$@ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf),$$(basename $$@)))
 
 $1/$2/build/%.$$($3_osuf) : $1/$2/build/%.hc includes/ghcautoconf.h includes/ghcplatform.h
-	$$(call cmd,$1_$2_CC) $$($1_$2_$3_ALL_CC_OPTS) $$(addprefix -I,$$(GHC_INCLUDE_DIRS)) -x c -c $$< -o $$@ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf),$$(basename $$@))) -fno-write-interface
+	$$(call cmd,$1_$2_CC) $$($1_$2_$3_ALL_CC_OPTS) $$(addprefix -I,$$(GHC_INCLUDE_DIRS)) -x c -c $$< -o $$@ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf),$$(basename $$@)))
 
 # $1/$2/build/%.$$($3_osuf) : $1/$2/build/%.$$($3_hcsuf)
 # 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
@@ -58,16 +58,16 @@ $1/$2/build/%.$$($3_osuf) : $1/$2/build/%.hc includes/ghcautoconf.h includes/ghc
 
 # Now the rules for hs-boot files.
 
-ifeq "$(SeparateHiCompilation)" "YES"
+ifeq "$$($1_$2_SEPARATE_HI)" "YES"
 $1/$2/build/%.$$($3_hi-bootsuf) : $1/$4/%.hs-boot $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP) $$($1_$2_PKGDATA_DEP)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf)-boot,$$(basename $$@))) -fno-code -fwrite-interface
 endif
 
 $1/$2/build/%.$$($3_o-bootsuf) : $1/$4/%.hs-boot $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP) $$($1_$2_PKGDATA_DEP)
-	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf)-boot,$$(basename $$@))) -fno-write-interface
+	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf)-boot,$$(basename $$@))) $$($1_$2_$3_O_HC_OPTS)
 
 $1/$2/build/%.$$($3_o-bootsuf) : $1/$4/%.lhs-boot $$(LAX_DEPS_FOLLOW) $$$$($1_$2_HC_DEP) $$($1_$2_PKGDATA_DEP)
-	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf)-boot,$$(basename $$@))) -fno-write-interface
+	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@ $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),-dyno $$(addsuffix .$$(dyn_osuf)-boot,$$(basename $$@))) $$($1_$2_$3_O_HC_OPTS)
 
 # stubs are automatically generated and compiled by GHC
 

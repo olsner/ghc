@@ -120,6 +120,14 @@ $1_$2_SplitSections = NO
 endif
 endif
 
+ifeq "$$($1_$2_SEPARATE_HI)" ""
+ifeq "$3" "1"
+$1_$2_SEPARATE_HI = $(SeparateHiCompilation)
+else
+$1_$2_SEPARATE_HI = NO
+endif
+endif
+
 $(call hs-sources,$1,$2)
 $(call c-sources,$1,$2)
 $(call includes-sources,$1,$2)
