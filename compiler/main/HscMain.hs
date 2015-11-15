@@ -1266,19 +1266,23 @@ hscNormalIface' simpl_result mb_old_iface = do
 --------------------------------------------------------------
 
 hscWriteIface :: DynFlags -> ModIface -> Bool -> ModSummary -> IO ()
-hscWriteIface dflags iface no_change mod_summary = do
-    let ifaceFile = ml_hi_file (ms_location mod_summary)
-    unless no_change $
+hscWriteIface _      _     True  _ = return () -- no change
+hscWriteIface dflags iface False mod_summary
+    | gopt Opt_NoInterface dflags =
+        throwOneError $ mkPlainErrMsg dflags noSrcSpan $
+            ptext (sLit "asked to make no interface file, but the interface has changed")
+    | otherwise = do
+        let ifaceFile = ml_hi_file (ms_location mod_summary)
         {-# SCC "writeIface" #-}
-        writeIfaceFile dflags ifaceFile iface
-    whenGeneratingDynamicToo dflags $ do
-        -- TODO: We should do a no_change check for the dynamic
-        --       interface file too
-        -- TODO: Should handle the dynamic hi filename properly
-        let dynIfaceFile = replaceExtension ifaceFile (dynHiSuf dflags)
-            dynIfaceFile' = addBootSuffix_maybe (mi_boot iface) dynIfaceFile
-            dynDflags = dynamicTooMkDynamicDynFlags dflags
-        writeIfaceFile dynDflags dynIfaceFile' iface
+            writeIfaceFile dflags ifaceFile iface
+        whenGeneratingDynamicToo dflags $ do
+            -- TODO: We should do a no_change check for the dynamic
+            --       interface file too
+            -- TODO: Should handle the dynamic hi filename properly
+            let dynIfaceFile = replaceExtension ifaceFile (dynHiSuf dflags)
+                dynIfaceFile' = addBootSuffix_maybe (mi_boot iface) dynIfaceFile
+                dynDflags = dynamicTooMkDynamicDynFlags dflags
+            writeIfaceFile dynDflags dynIfaceFile' iface
 
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModSummary -> FilePath

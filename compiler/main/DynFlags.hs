@@ -379,6 +379,7 @@ data GeneralFlag
    | Opt_OmitInterfacePragmas
    | Opt_ExposeAllUnfoldings
    | Opt_WriteInterface -- forces .hi files to be written even with -fno-code
+   | Opt_NoInterface -- forces .hi file *not* to be written
 
    -- profiling opts
    | Opt_AutoSccsOnIndividualCafs
@@ -3026,6 +3027,7 @@ fFlags = [
   flagSpec "strictness"                       Opt_Strictness,
   flagSpec "use-rpaths"                       Opt_RPath,
   flagSpec "write-interface"                  Opt_WriteInterface,
+  flagSpec "no-interface"                     Opt_NoInterface,
   flagSpec "unbox-small-strict-fields"        Opt_UnboxSmallStrictFields,
   flagSpec "unbox-strict-fields"              Opt_UnboxStrictFields,
   flagSpec "vectorisation-avoidance"          Opt_VectorisationAvoidance,
