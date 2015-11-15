@@ -121,6 +121,7 @@ import IfaceEnv         ( initNameCache )
 import LoadIface        ( ifaceStats, initExternalPackageState
                         , findAndReadIface )
 import PrelInfo
+import LoadIface        ( pprModIface )
 import MkIface
 import Desugar
 import SimplCore
@@ -665,7 +666,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
                        else finishTypecheckOnly hsc_env mod_summary tc_result mb_old_hash
                 FrontendMerge raw_iface ->
                             finishMerge         hsc_env mod_summary raw_iface mb_old_hash
-            liftIO $ hscMaybeWriteIface dflags (hm_iface hmi) no_change mod_summary
+            liftIO $ hscMaybeWriteIface dflags (hm_iface hmi) no_change mod_summary mb_old_iface
             return (status, hmi)
 
 -- Generates and writes out the final interface for an hs-boot merge.
@@ -739,14 +740,18 @@ finish hsc_env summary tc_result mb_old_hash = do
                          hm_linkable = Nothing },
             changed)
 
-hscMaybeWriteIface :: DynFlags -> ModIface -> Bool -> ModSummary -> IO ()
-hscMaybeWriteIface dflags iface no_change summary =
+hscMaybeWriteIface :: DynFlags -> ModIface -> Bool -> ModSummary -> Maybe ModIface -> IO ()
+hscMaybeWriteIface dflags iface no_change summary mb_old_iface = do
+    dumpIfSet dflags (not no_change && isJust mb_old_iface) "OLD INTERFACE" $
+      pprModIface (fromJust mb_old_iface)
+    dumpIfSet dflags (not no_change && isJust mb_old_iface) "NEW INTERFACE" $
+      pprModIface iface
     let force_write_interface = gopt Opt_WriteInterface dflags
         write_interface = case hscTarget dflags of
                             HscNothing      -> False
                             HscInterpreted  -> False
                             _               -> True
-    in when (write_interface || force_write_interface) $
+    when (write_interface || force_write_interface) $
             hscWriteIface dflags iface no_change summary
 
 --------------------------------------------------------------
