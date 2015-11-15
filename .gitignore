@@ -100,6 +100,7 @@ _darcs/
 /docs/users_guide/build-pdf
 /docs/users_guide/.doctrees-html
 /docs/users_guide/.doctrees-pdf
+/docs/users_guide/.doctrees
 /driver/ghci/ghc-pkg-inplace
 /driver/ghci/ghci-inplace
 /driver/ghci/ghci.res
